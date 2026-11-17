@@ -30,6 +30,28 @@ def test_qa01_profile_pic_valid_png_is_accepted(app, client):
     os.remove(path)
 
 
+def test_qa01_profile_pic_phone_jpeg_mpo_is_accepted(app, client):
+    from PIL import Image
+    mpo = io.BytesIO()
+    Image.new("RGB", (10, 10)).save(mpo, format="MPO", save_all=True,
+                                    append_images=[Image.new("RGB", (10, 10))])
+    mpo.seek(0)
+    user = make_user("phone@example.com")
+    login(client, "phone@example.com")
+
+    response = client.post(
+        "/profile",
+        data={"profile_pic": (mpo, "IMG_0001.jpg")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert b"Profile updated successfully." in response.data
+    stored = db.session.get(User, user.id).profile_pic
+    assert stored != "default.jpg"
+    os.remove(os.path.join(app.root_path, "static", "profile_pics", stored))
+
+
 def test_qa01_profile_pic_fake_image_is_rejected(app, client):
     user = make_user("fake@example.com")
     login(client, "fake@example.com")

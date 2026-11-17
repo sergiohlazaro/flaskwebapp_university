@@ -82,7 +82,9 @@ def detect_image_type(stream):
     try:
         with Image.open(stream) as image:
             image.verify()
-            return (image.format or '').lower() or None
+            detected = (image.format or '').lower() or None
+            # Pillow identifica como 'MPO' los JPEG multi-imagen de muchos móviles
+            return 'jpeg' if detected == 'mpo' else detected
     except (UnidentifiedImageError, OSError, SyntaxError):
         return None
     finally:
