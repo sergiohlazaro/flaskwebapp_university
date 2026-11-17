@@ -43,3 +43,22 @@ def test_qa01_profile_pic_fake_image_is_rejected(app, client):
 
     assert b"Invalid image file type." in response.data
     assert db.session.get(User, user.id).profile_pic == "default.jpg"
+
+
+# ---------------------------------------------------------------------------
+# QA-02: los tests no deben tocar la base de datos real
+# ---------------------------------------------------------------------------
+
+def test_qa02_create_app_uses_config_passed_before_init(tmp_path):
+    from website import create_app
+    db_file = tmp_path / "isolated.db"
+
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_file}"})
+
+    with app.app_context():
+        assert db.engine.url.database == str(db_file)
+        assert User.query.count() == 0  # sin usuarios sembrados en modo test
+
+
+def test_qa02_fixture_uses_in_memory_database(app):
+    assert db.engine.url.database in (None, "", ":memory:")

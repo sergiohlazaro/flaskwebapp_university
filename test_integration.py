@@ -5,8 +5,9 @@ from werkzeug.security import generate_password_hash
 
 @pytest.fixture
 def app():
-    app = create_app()
-    app.config.update({
+    # La configuración se pasa a create_app para que se aplique ANTES de
+    # inicializar la BD (si no, los tests usarían y borrarían la BD real).
+    app = create_app({
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "WTF_CSRF_ENABLED": False

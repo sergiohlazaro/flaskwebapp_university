@@ -32,7 +32,10 @@ DB_NAME = "database.db"
 # CREACIÓN Y CONFIGURACIÓN DE LA APLICACIÓN
 # ----------------------------------------------
 
-def create_app():
+def create_app(test_config=None):
+    # test_config: diccionario opcional que sobrescribe la configuración ANTES de
+    # inicializar las extensiones (necesario para que los tests usen su propia BD).
+
     # Crear la instancia de Flask
     app = Flask(__name__)
 
@@ -50,6 +53,9 @@ def create_app():
     app.config['SESSION_COOKIE_SECURE'] = True      # Solo enviar por HTTPS
     app.config['SESSION_COOKIE_HTTPONLY'] = True    # Inaccesibles vía Javascript (mitiga XSS)
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'   # Previene ataques CSRF entre sitios
+
+    if test_config:
+        app.config.update(test_config)
 
     # ------------------------------
     # INICIALIZACIÓN DE EXTENSIONES
