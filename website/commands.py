@@ -2,7 +2,7 @@
 import click
 from werkzeug.security import generate_password_hash
 
-from . import db
+from .extensions import db
 from .models import User
 
 MIN_PASSWORD_LENGTH = 8

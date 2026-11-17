@@ -7,7 +7,7 @@ from functools import wraps  # Para construir decoradores (admin_required)
 from werkzeug.utils import secure_filename  # Asegura que los nombres de archivos sean seguros para guardarlos
 from flask import Blueprint, abort, current_app, json, jsonify, redirect, render_template, url_for, request, flash
 from flask_login import login_required, current_user, logout_user  # Gestión de sesiones de usuarios
-from . import cache  # Sistema de cache para mejorar rendimiento
+
 
 # Modelos de base de datos
 from .models import db, LoginRecord, User, Publication, Message
@@ -28,7 +28,7 @@ import logging
 from PIL import Image, UnidentifiedImageError
 
 # Importación del limitador de solicitudes (Rate Limiting) para prevenir ataques de fuerza bruta
-from . import limiter
+from .extensions import limiter
 
 # ---------------------------------
 # CONFIGURACIONES
@@ -270,7 +270,6 @@ def delete_account():
 
 @views.route('/admin')
 @login_required
-@cache.cached(timeout=60)
 def admin():
     """
     Solo accesible para administradores.
@@ -424,7 +423,6 @@ def deletePublication():
 
 @views.route('/viewuser/<email>')
 @login_required
-@cache.cached(timeout=60)
 def viewuser(email):
     """
     Muestra las publicaciones de otro usuario.
@@ -448,7 +446,6 @@ def viewuser(email):
 
 @views.route('/userlist')
 @login_required
-@cache.cached(timeout=60)
 def userlist():
     """
     Muestra la lista de todos los usuarios excepto el actual.

@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for
 from .models import LoginRecord, User
 
 # Importación de la instancia de la base de datos
-from . import db
+from .extensions import db
 
 # Importación de funciones para gestión de usuarios autenticados
 from flask_login import login_user, login_required, logout_user, current_user
@@ -14,7 +14,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # Importación del limitador de solicitudes (Rate Limiting) para prevenir ataques de fuerza bruta
-from . import limiter
+from .extensions import limiter
 
 from flask import session
 

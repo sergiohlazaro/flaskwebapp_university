@@ -3,6 +3,7 @@ import io
 import os
 
 from conftest import login, make_user, png_bytes
+
 from website import db
 from website.models import User
 

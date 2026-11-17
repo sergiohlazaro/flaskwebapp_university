@@ -11,11 +11,13 @@ PASSWORD = "password123"
 
 
 @pytest.fixture
-def app():
+def app(tmp_path):
     app = create_app({
         "TESTING": True,
+        "SECRET_KEY": "test-secret-key",
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "WTF_CSRF_ENABLED": False,
+        "UPLOAD_ROOT": str(tmp_path / "uploads"),
     })
     with app.app_context():
         db.create_all()
