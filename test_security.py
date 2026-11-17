@@ -62,3 +62,42 @@ def test_qa02_create_app_uses_config_passed_before_init(tmp_path):
 
 def test_qa02_fixture_uses_in_memory_database(app):
     assert db.engine.url.database in (None, "", ":memory:")
+
+
+# ---------------------------------------------------------------------------
+# SEC-01: solo un administrador puede bloquear o desbloquear usuarios
+# ---------------------------------------------------------------------------
+
+def test_sec01_normal_user_cannot_block_admin(client):
+    admin = make_user("admin@example.com", role=0)
+    make_user("attacker@example.com")
+    login(client, "attacker@example.com")
+
+    response = client.post(f"/block_user/{admin.id}")
+
+    assert response.status_code == 403
+    assert db.session.get(User, admin.id).is_blocked is False
+
+
+def test_sec01_normal_user_cannot_unblock_user(client):
+    victim = make_user("blocked@example.com")
+    victim.is_blocked = True
+    db.session.commit()
+    make_user("attacker@example.com")
+    login(client, "attacker@example.com")
+
+    response = client.post(f"/unblock_user/{victim.id}")
+
+    assert response.status_code == 403
+    assert db.session.get(User, victim.id).is_blocked is True
+
+
+def test_sec01_admin_can_still_block_user(client):
+    make_user("admin@example.com", role=0)
+    target = make_user("target@example.com")
+    login(client, "admin@example.com")
+
+    response = client.post(f"/block_user/{target.id}", follow_redirects=True)
+
+    assert b"User blocked" in response.data
+    assert db.session.get(User, target.id).is_blocked is True

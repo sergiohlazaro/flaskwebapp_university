@@ -2,8 +2,9 @@
 # IMPORTACIONES
 # ---------------------------------
 import os  # Librería para operaciones con archivos y carpetas
+from functools import wraps  # Para construir decoradores (admin_required)
 from werkzeug.utils import secure_filename  # Asegura que los nombres de archivos sean seguros para guardarlos
-from flask import Blueprint, json, jsonify, redirect, render_template, url_for, request, flash
+from flask import Blueprint, abort, current_app, json, jsonify, redirect, render_template, url_for, request, flash
 from flask_login import login_required, current_user, logout_user  # Gestión de sesiones de usuarios
 from . import cache  # Sistema de cache para mejorar rendimiento
 
@@ -47,6 +48,17 @@ UPLOAD_FOLDER = 'website/static/profile_pics'
 # ---------------------------------
 # FUNCIONES DE UTILIDAD
 # ---------------------------------
+
+# Restringe una ruta a administradores (role == 0). Responde 403 al resto.
+# Debe colocarse DESPUÉS de @login_required para que current_user esté autenticado.
+def admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if current_user.role != 0:
+            current_app.logger.warning(f"Forbidden admin action by user {current_user.id} on {request.path}")
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapped
 
 # Verifica si un archivo tiene una extensión válida para imágenes
 def allowed_file(filename):
@@ -275,6 +287,7 @@ def admin():
 
 @views.route('/block_user/<int:user_id>', methods=['POST'])
 @login_required
+@admin_required
 def block_user(user_id):
     """
     Bloquea a un usuario (solo accesible para admins desde el panel).
@@ -291,6 +304,7 @@ def block_user(user_id):
 
 @views.route('/unblock_user/<user_id>', methods=['POST'])
 @login_required
+@admin_required
 def unblock_user(user_id):
     """
     Desbloquea a un usuario previamente bloqueado.
