@@ -19,14 +19,11 @@ from sqlalchemy import or_, and_
 # Sanitización de entradas para evitar ataques XSS
 import bleach
 
-# Para verificar tipo real de archivos subidos
-import imghdr
-
 # Para logging de eventos
 import logging
 
-# Para procesamiento de imágenes
-from PIL import Image
+# Para procesamiento de imágenes y verificación del tipo real de archivos subidos
+from PIL import Image, UnidentifiedImageError
 
 # Importación del limitador de solicitudes (Rate Limiting) para prevenir ataques de fuerza bruta
 from . import limiter
@@ -58,6 +55,18 @@ def allowed_file(filename):
 # Verifica si un archivo tiene una extensión válida para archivos en general
 def allowed_file_generic(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS_DOCS
+
+# Detecta el tipo real de una imagen a partir de su contenido (sustituye a imghdr,
+# eliminado en Python 3.13). Devuelve 'png', 'jpeg', 'gif'... o None si no es imagen.
+def detect_image_type(stream):
+    try:
+        with Image.open(stream) as image:
+            image.verify()
+            return (image.format or '').lower() or None
+    except (UnidentifiedImageError, OSError, SyntaxError):
+        return None
+    finally:
+        stream.seek(0)
 
 # ---------------------------------
 # RUTAS PRINCIPALES (HOME, ABOUT, CONTACT)
@@ -150,9 +159,7 @@ def profile():
                 flash('No selected file', category='error')
                 return render_template('profile.html', user=current_user)
             if file and allowed_file(file.filename):
-                file_bytes = file.read()
-                file.seek(0)
-                detected_type = imghdr.what(None, h=file_bytes)
+                detected_type = detect_image_type(file.stream)
                 if detected_type in ALLOWED_EXTENSIONS:
                     if not os.path.exists(UPLOAD_FOLDER):
                         os.makedirs(UPLOAD_FOLDER)
