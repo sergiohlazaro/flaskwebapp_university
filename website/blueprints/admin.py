@@ -1,23 +1,276 @@
-"""Panel de administración: asignaturas (spec §5.2, §5.9)."""
+"""Panel de administración: usuarios, asignaturas, reportes y contenido oculto (spec §5.2, §5.6, §5.9)."""
 
-from flask import Blueprint, abort, flash, redirect, render_template, url_for
-from flask_login import login_required
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 
 from ..extensions import db
 from ..forms import SubjectForm
-from ..models import Subject
+from ..models import (
+    Comment,
+    LoginRecord,
+    Material,
+    Report,
+    ReportStatus,
+    ReportTarget,
+    Subject,
+    User,
+    utcnow,
+)
 from ..services.permissions import admin_required
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 
 DUPLICATE_MSG = "Ya existe una asignatura con ese nombre."
+USERS_PER_PAGE = 20
+MAX_INT = 2**63 - 1
+MAX_PAGE = 1_000_000
+EXCERPT_LEN = 120
+STATUS_BY_SLUG = {
+    "pendiente": ReportStatus.PENDING,
+    "resuelto": ReportStatus.RESOLVED,
+    "descartado": ReportStatus.DISMISSED,
+}
 
 
 @admin.context_processor
 def _tabs_context():
-    # La Tarea 11 sustituirá el 0 por el número real de reportes pendientes.
-    return {"pending_reports_count": 0}
+    count = db.session.scalar(
+        select(func.count(Report.id)).where(Report.status == ReportStatus.PENDING)
+    )
+    return {"pending_reports_count": count or 0}
+
+
+def _page_param(value):
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return 1
+    return min(number, MAX_PAGE) if 1 <= number <= MAX_INT else 1
+
+
+def _escape_like(text):
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+@admin.route("")
+@login_required
+@admin_required
+def index():
+    return redirect(url_for("admin.users"))
+
+
+# --- Usuarios -------------------------------------------------------------
+
+@admin.route("/usuarios")
+@login_required
+@admin_required
+def users():
+    q = request.args.get("q", "").strip()[:100]
+    query = select(User).order_by(User.name, User.surname, User.id)
+    if q:
+        pattern = f"%{_escape_like(q)}%"
+        full_name = User.name + " " + User.surname
+        query = query.where(
+            User.name.ilike(pattern, escape="\\") | User.surname.ilike(pattern, escape="\\")
+            | User.email.ilike(pattern, escape="\\") | full_name.ilike(pattern, escape="\\")
+        )
+    page = _page_param(request.args.get("pagina"))
+    pagination = db.paginate(query, page=page, per_page=USERS_PER_PAGE, error_out=False)
+
+    def page_url(number):
+        return url_for("admin.users", q=q or None, pagina=number if number > 1 else None)
+
+    ids = [u.id for u in pagination.items]
+    last_login = dict(db.session.execute(
+        select(LoginRecord.user_id, func.max(LoginRecord.login_time))
+        .where(LoginRecord.user_id.in_(ids)).group_by(LoginRecord.user_id)
+    ).all()) if ids else {}
+    rows = [(u, last_login.get(u.id)) for u in pagination.items]
+
+    return render_template("admin/users.html", rows=rows, q=q, active_tab="users",
+                           page=pagination.page, pages=pagination.pages, page_url=page_url)
+
+
+def _user_or_404(user_id):
+    return db.session.get(User, user_id) or abort(404)
+
+
+@admin.route("/usuarios/<int:user_id>/bloquear", methods=["POST"])
+@login_required
+@admin_required
+def block(user_id):
+    user = _user_or_404(user_id)
+    if user.id == current_user.id:
+        flash("No puedes bloquear tu propia cuenta.", "error")
+        return users(), 400
+    if user.is_admin:
+        others = db.session.scalar(
+            select(func.count(User.id)).where(User.role == 0, User.is_blocked.is_(False), User.id != user.id)
+        )
+        if not others:
+            flash("No se puede bloquear al último administrador activo.", "error")
+            return users(), 400
+    user.is_blocked = True
+    db.session.commit()
+    flash("Usuario bloqueado.", "success")
+    return redirect(url_for("admin.users"))
+
+
+@admin.route("/usuarios/<int:user_id>/desbloquear", methods=["POST"])
+@login_required
+@admin_required
+def unblock(user_id):
+    user = _user_or_404(user_id)
+    user.is_blocked = False
+    db.session.commit()
+    flash("Usuario desbloqueado.", "success")
+    return redirect(url_for("admin.users"))
+
+
+@admin.route("/usuarios/<int:user_id>/profesor", methods=["POST"])
+@login_required
+@admin_required
+def toggle_teacher(user_id):
+    user = _user_or_404(user_id)
+    user.is_teacher = not user.is_teacher
+    db.session.commit()
+    flash("Marcado como profesor/a." if user.is_teacher else "Ya no figura como profesor/a.", "success")
+    return redirect(url_for("admin.users"))
+
+
+@admin.route("/usuarios/<int:user_id>/accesos")
+@login_required
+@admin_required
+def user_logins(user_id):
+    user = _user_or_404(user_id)
+    records = db.session.scalars(
+        select(LoginRecord).where(LoginRecord.user_id == user.id)
+        .order_by(LoginRecord.login_time.desc(), LoginRecord.id.desc()).limit(200)
+    ).all()
+    return render_template("admin/user_logins.html", target=user, records=records, active_tab="users")
+
+
+# --- Reportes -------------------------------------------------------------
+
+def _excerpt(text):
+    return text if len(text) <= EXCERPT_LEN else text[:EXCERPT_LEN]
+
+
+@admin.route("/reportes")
+@login_required
+@admin_required
+def reports():
+    slug = request.args.get("estado", "pendiente")
+    if slug not in STATUS_BY_SLUG:
+        slug = "pendiente"
+    status = STATUS_BY_SLUG[slug]
+    order = (Report.created_at.asc(), Report.id.asc()) if status is ReportStatus.PENDING else (
+        Report.resolved_at.desc(), Report.id.desc())
+    rows = db.session.scalars(
+        select(Report).options(joinedload(Report.reporter)).where(Report.status == status).order_by(*order)
+    ).all()
+    material_ids = {r.target_id for r in rows if r.target_type is ReportTarget.MATERIAL}
+    comment_ids = {r.target_id for r in rows if r.target_type is ReportTarget.COMMENT}
+    comments = {c.id: c for c in db.session.scalars(select(Comment).where(Comment.id.in_(comment_ids)))} \
+        if comment_ids else {}
+    material_ids |= {c.material_id for c in comments.values()}
+    materials = {m.id: m for m in db.session.scalars(select(Material).where(Material.id.in_(material_ids)))} \
+        if material_ids else {}
+    items = []
+    for report in rows:
+        link = excerpt = None
+        if report.target_type is ReportTarget.MATERIAL:
+            material = materials.get(report.target_id)
+            if material:
+                link = url_for("materials.detail", material_id=material.id)
+                excerpt = material.title
+        else:
+            comment = comments.get(report.target_id)
+            if comment and comment.material_id in materials:
+                link = url_for("materials.detail", material_id=comment.material_id) + f"#comment-{comment.id}"
+                excerpt = _excerpt(comment.body)
+        items.append({"report": report, "link": link, "excerpt": excerpt})
+    return render_template("admin/reports.html", items=items, estado=slug, active_tab="reports")
+
+
+def _pending_report_or_error(report_id):
+    report = db.session.get(Report, report_id) or abort(404)
+    if report.status is not ReportStatus.PENDING:
+        abort(400)
+    return report
+
+
+def _target(report):
+    model = Material if report.target_type is ReportTarget.MATERIAL else Comment
+    return db.session.get(model, report.target_id)
+
+
+@admin.route("/reportes/<int:report_id>/ocultar", methods=["POST"])
+@login_required
+@admin_required
+def resolve_report(report_id):
+    report = _pending_report_or_error(report_id)
+    target = _target(report)
+    if target is None:
+        abort(400)
+    target.is_hidden = True
+    now = utcnow()
+    pending = db.session.scalars(
+        select(Report).where(Report.target_type == report.target_type, Report.target_id == report.target_id,
+                             Report.status == ReportStatus.PENDING)
+    ).all()
+    for item in pending:
+        item.status = ReportStatus.RESOLVED
+        item.resolved_by_id = current_user.id
+        item.resolved_at = now
+    db.session.commit()
+    flash("Contenido ocultado y reportes resueltos.", "success")
+    return redirect(url_for("admin.reports"))
+
+
+@admin.route("/reportes/<int:report_id>/descartar", methods=["POST"])
+@login_required
+@admin_required
+def dismiss_report(report_id):
+    report = _pending_report_or_error(report_id)
+    report.status = ReportStatus.DISMISSED
+    report.resolved_by_id = current_user.id
+    report.resolved_at = utcnow()
+    db.session.commit()
+    flash("Reporte descartado.", "success")
+    return redirect(url_for("admin.reports"))
+
+
+# --- Contenido oculto -----------------------------------------------------
+
+@admin.route("/oculto")
+@login_required
+@admin_required
+def hidden():
+    materials = db.session.scalars(
+        select(Material).options(joinedload(Material.author)).where(Material.is_hidden.is_(True))
+        .order_by(Material.updated_at.desc(), Material.id.desc())
+    ).all()
+    comments = db.session.scalars(
+        select(Comment).options(joinedload(Comment.author), joinedload(Comment.material))
+        .where(Comment.is_hidden.is_(True)).order_by(Comment.created_at.desc(), Comment.id.desc())
+    ).all()
+    return render_template("admin/hidden.html", materials=materials, comments=comments, active_tab="hidden")
+
+
+@admin.route("/oculto/<target_type>/<int:target_id>/restaurar", methods=["POST"])
+@login_required
+@admin_required
+def restore(target_type, target_id):
+    model = {"material": Material, "comment": Comment}.get(target_type) or abort(404)
+    item = db.session.get(model, target_id) or abort(404)
+    item.is_hidden = False
+    db.session.commit()
+    flash("Contenido restaurado.", "success")
+    return redirect(url_for("admin.hidden"))
 
 
 def _name_taken(name, exclude_id=None):

@@ -37,7 +37,7 @@
                         <li><a class="dropdown-item" href="/u/{{ current_user.id }}">Mi perfil</a></li>
                         <li><a class="dropdown-item" href="/cuenta">Mi cuenta</a></li>
                         {% if current_user.is_admin %}
-                        <li><a class="dropdown-item" href="/admin">Administración</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('admin.users') }}">Administración</a></li>
                         {% endif %}
                         <li><hr class="dropdown-divider"></li>
                         <li>

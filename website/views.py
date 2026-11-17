@@ -27,7 +27,6 @@ import logging
 from .extensions import limiter
 
 # Servicios compartidos (permisos y almacenamiento privado de subidas)
-from .services.permissions import admin_required
 from .services.uploads import UploadError, save_avatar
 
 # ---------------------------------
@@ -195,70 +194,6 @@ def delete_account():
     logout_user()
     flash('Your account has been deleted.', category='success')
     return redirect(url_for('auth.login'))
-
-# ---------------------------------
-# PANEL DE ADMINISTRACIÓN
-# ---------------------------------
-
-@views.route('/admin')
-@login_required
-def admin():
-    """
-    Solo accesible para administradores.
-    Muestra la lista de usuarios (excepto uno mismo) y sus registros de inicio de sesión.
-    """
-
-    # Verificar que el usuario tiene rol de administrador
-    if current_user.role != 0:
-        flash('You are not allowed to access this page', category='error')
-        return redirect(url_for('materials.explore'))
-
-    # Obtener todos los usuarios excepto el admin que está logueado
-    users = User.query.filter(User.id != current_user.id).all()
-
-    # Obtener todos los registros de inicio de sesión
-    login_records = LoginRecord.query.all()
-
-    # Renderizar panel de administración
-    return render_template('legacy/admin.html', user=current_user, users=users, login_records=login_records)
-
-# ---------------------------------
-# BLOQUEAR Y DESBLOQUEAR USUARIOS (Solo Admin)
-# ---------------------------------
-
-@views.route('/block_user/<int:user_id>', methods=['POST'])
-@login_required
-@admin_required
-def block_user(user_id):
-    """
-    Bloquea a un usuario (solo accesible para admins desde el panel).
-    """
-    user = User.query.get(user_id)
-    if user:
-        user.is_blocked = True
-        db.session.commit()
-        flash('User blocked', category='success')
-    else:
-        flash('User not found', category='error')
-
-    return redirect(url_for('views.admin'))
-
-@views.route('/unblock_user/<user_id>', methods=['POST'])
-@login_required
-@admin_required
-def unblock_user(user_id):
-    """
-    Desbloquea a un usuario previamente bloqueado.
-    """
-    user = User.query.get(user_id)
-    if user:
-        user.is_blocked = False
-        db.session.commit()
-        flash('User has been unblocked', category='success')
-    else:
-        flash('User does not exist', category='error')
-
-    return redirect(url_for('views.admin'))
 
 # ---------------------------------
 # PUBLICACIONES (CREAR, VER, ELIMINAR)

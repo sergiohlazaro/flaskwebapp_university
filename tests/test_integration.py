@@ -90,8 +90,8 @@ def test_admin_block_unblock_user_flow(client, app):
     client.post("/login", data={"email": "admin@example.com", "password": "adminpass"}, follow_redirects=True)
 
     # TC-028: Bloquear usuario desde panel admin
-    response = client.post(f"/block_user/{user_id}", follow_redirects=True)
-    assert b"User blocked" in response.data
+    response = client.post(f"/admin/usuarios/{user_id}/bloquear", follow_redirects=True)
+    assert b"Usuario bloqueado." in response.data
 
     # Logout admin
     client.post("/logout", follow_redirects=True)
@@ -105,8 +105,8 @@ def test_admin_block_unblock_user_flow(client, app):
     client.post("/login", data={"email": "admin@example.com", "password": "adminpass"}, follow_redirects=True)
 
     # TC-029: Desbloquear usuario desde panel admin
-    response = client.post(f"/unblock_user/{user_id}", follow_redirects=True)
-    assert b"User has been unblocked" in response.data
+    response = client.post(f"/admin/usuarios/{user_id}/desbloquear", follow_redirects=True)
+    assert b"Usuario desbloqueado." in response.data
 
     # Logout admin
     client.post("/logout", follow_redirects=True)

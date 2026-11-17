@@ -1,0 +1,18 @@
+{% extends "admin/layout.html" %}
+{% block title %}Accesos · {{ app_name }}{% endblock %}
+{% block admin_content %}
+<p><a href="{{ url_for('admin.users') }}"><i class="bi bi-arrow-left"></i> Volver a usuarios</a></p>
+<h2 class="h5">Accesos de {{ target.display_name }}</h2>
+{% if records %}
+<table class="table">
+    <thead><tr><th>Dirección IP</th><th>Fecha</th></tr></thead>
+    <tbody>
+    {% for record in records %}
+        <tr><td>{{ record.ip_address }}</td><td>{{ record.login_time|localtime }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="text-secondary">Este usuario todavía no ha iniciado sesión.</p>
+{% endif %}
+{% endblock %}

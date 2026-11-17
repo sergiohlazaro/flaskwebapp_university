@@ -1,0 +1,47 @@
+{% extends "admin/layout.html" %}
+{% block title %}Reportes · {{ app_name }}{% endblock %}
+{% block admin_content %}
+<ul class="nav nav-pills mb-3">
+    {% for slug, label in [("pendiente", "Pendientes"), ("resuelto", "Resueltos"), ("descartado", "Descartados")] %}
+    <li class="nav-item"><a class="nav-link{{ ' active' if estado == slug }}" href="{{ url_for('admin.reports', estado=slug) }}">{{ label }}</a></li>
+    {% endfor %}
+</ul>
+{% if items %}
+<ul class="list-group">
+    {% for item in items %}
+    {% set report = item.report %}
+    <li class="list-group-item">
+        <div class="d-flex flex-wrap justify-content-between gap-2">
+            <div>
+                <span class="badge text-bg-secondary">{{ report.reason.value }}</span>
+                <span class="badge text-bg-light">{{ "Material" if report.target_type.value == "material" else "Comentario" }}</span>
+                {% if report.details %}<p class="mb-1 mt-2">{{ report.details }}</p>{% endif %}
+                <p class="text-secondary small mb-1">Reportado por {{ report.reporter.display_name }} · {{ report.created_at|timeago }}</p>
+                {% if item.link %}
+                <a href="{{ item.link }}">{{ item.excerpt }}</a>
+                {% else %}
+                <span class="text-secondary">Contenido eliminado</span>
+                {% endif %}
+            </div>
+            {% if estado == "pendiente" %}
+            <div class="d-flex gap-2 align-items-start">
+                {% if item.link %}
+                <form method="post" action="{{ url_for('admin.resolve_report', report_id=report.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-danger">Ocultar contenido</button>
+                </form>
+                {% endif %}
+                <form method="post" action="{{ url_for('admin.dismiss_report', report_id=report.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Descartar</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="text-secondary">No hay reportes en esta lista.</p>
+{% endif %}
+{% endblock %}
