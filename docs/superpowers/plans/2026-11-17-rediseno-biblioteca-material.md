@@ -91,7 +91,7 @@
 
 ---
 
-### Tarea 1: Configuración por entorno, extensiones y tests en `tests/`
+### Task 1: Configuración por entorno, extensiones y tests en `tests/`
 
 **Ficheros:**
 - Crear: `website/config.py`, `website/extensions.py`, `tests/conftest.py`, `tests/test_config.py`
@@ -151,7 +151,7 @@ def test_no_flask_caching_extension(app):
 
 ---
 
-### Tarea 2: Modelo de datos nuevo y filtros de fecha
+### Task 2: Modelo de datos nuevo y filtros de fecha
 
 **Ficheros:**
 - Modificar: `website/models.py`
@@ -202,7 +202,7 @@ def test_localtime_converts_utc_to_madrid(): ...    # 2026-07-01 10:00 UTC → "
 
 ---
 
-### Tarea 3: Servicio de subidas y descargas protegidas
+### Task 3: Servicio de subidas y descargas protegidas
 
 **Ficheros:**
 - Crear: `website/services/__init__.py`, `website/services/uploads.py`, `website/services/permissions.py`, `website/blueprints/__init__.py`, `website/blueprints/files.py`, `tests/test_uploads.py`, `tests/test_files.py`
@@ -252,7 +252,7 @@ def test_files_live_outside_static(app): ...             # upload_path(...) empi
 
 ---
 
-### Tarea 4: Layout, tema, cabeceras de seguridad y páginas públicas
+### Task 4: Layout, tema, cabeceras de seguridad y páginas públicas
 
 **Ficheros:**
 - Crear: `website/templates/base.html` (sustituye al viejo; el viejo pasa a `templates/legacy/base.html` y las plantillas viejas lo extienden hasta la Tarea 14), `website/templates/partials/{navbar,flash,material_card,pagination,user_badge}.html`, `website/templates/main/{landing,about,contact,legal,privacy,cookies}.html`, `website/static/css/app.css`, `website/static/js/app.js`, `website/services/headers.py`, `website/blueprints/main.py`, `tests/test_layout.py`
@@ -313,7 +313,7 @@ def test_logout_requires_post(app, client): ... # GET /logout → 405; POST con 
 
 ---
 
-### Tarea 5: Autenticación renovada
+### Task 5: Autenticación renovada
 
 **Ficheros:**
 - Crear: `website/blueprints/auth.py` (sustituye a `website/auth.py`), `website/forms.py` (`LoginForm`, `SignupForm`), `website/templates/auth/{login,signup}.html`, `tests/test_auth.py`
@@ -345,7 +345,7 @@ def test_signup_cannot_set_teacher_or_admin(client): ...     # is_teacher=1 y ro
 
 ---
 
-### Tarea 6: Panel de admin: estructura y asignaturas
+### Task 6: Panel de admin: estructura y asignaturas
 
 **Ficheros:**
 - Crear: `website/blueprints/admin.py`, `website/templates/admin/{layout,subjects}.html`, `tests/test_admin_subjects.py`
@@ -366,7 +366,7 @@ def test_signup_cannot_set_teacher_or_admin(client): ...     # is_teacher=1 y ro
 
 ---
 
-### Tarea 7: Subir, editar y borrar material
+### Task 7: Subir, editar y borrar material
 
 **Ficheros:**
 - Crear: `website/blueprints/materials.py`, `website/templates/materials/form.html`, `tests/test_material_crud.py`
@@ -397,7 +397,7 @@ def test_description_is_stored_as_plain_text(app, client): ...  # QA-06: "a < b 
 
 ---
 
-### Tarea 8: Feed "Explorar" con búsqueda, filtros y orden
+### Task 8: Feed "Explorar" con búsqueda, filtros y orden
 
 **Ficheros:**
 - Modificar: `website/blueprints/materials.py`
@@ -438,7 +438,7 @@ def test_card_shows_teacher_badge_rating_and_file_count(app, client): ...
 
 ---
 
-### Tarea 9: Detalle de material, valoraciones y guardados
+### Task 9: Detalle de material, valoraciones y guardados
 
 **Ficheros:**
 - Modificar: `website/blueprints/materials.py`
@@ -473,7 +473,7 @@ def test_htmx_rate_returns_partial(app, client): ...
 
 ---
 
-### Tarea 10: Comentarios y reportes
+### Task 10: Comentarios y reportes
 
 **Ficheros:**
 - Modificar: `website/blueprints/materials.py`, `website/forms.py` (`CommentForm`, `ReportForm`)
@@ -508,7 +508,7 @@ def test_report_unknown_target_404(app, client): ...
 
 ---
 
-### Tarea 11: Admin: usuarios, reportes y contenido oculto
+### Task 11: Admin: usuarios, reportes y contenido oculto
 
 **Ficheros:**
 - Modificar: `website/blueprints/admin.py`
@@ -548,7 +548,7 @@ def test_teacher_badge_follows_current_flag(app, client): ... # spec §5.1: al d
 
 ---
 
-### Tarea 12: Perfil público, mi cuenta y directorio
+### Task 12: Perfil público, mi cuenta y directorio
 
 **Ficheros:**
 - Crear: `website/blueprints/users.py`, `website/templates/users/{profile,account,directory}.html`, `tests/test_users.py`
@@ -588,7 +588,7 @@ def test_old_urls_redirect(client): ...
 
 ---
 
-### Tarea 13: Mensajería renovada
+### Task 13: Mensajería renovada
 
 **Ficheros:**
 - Crear: `website/blueprints/messages.py`, `website/templates/messages/{inbox,conversation}.html`, `website/templates/partials/{conversation_list,message_thread,user_picker}.html`, `tests/test_messages.py`
@@ -622,7 +622,7 @@ def test_message_content_required_and_max_5000(app, client): ...
 
 ---
 
-### Tarea 14: Retirar lo antiguo, migraciones, documentación y verificación final
+### Task 14: Retirar lo antiguo, migraciones, documentación y verificación final
 
 **Ficheros:**
 - Borrar: `website/views.py`, `website/auth.py` (si sigue existiendo), `website/templates/legacy/`, las plantillas viejas restantes, el modelo `Publication`, `website/static/profile_pics/` (mover `default.jpg` a `website/static/img/default-avatar.jpg`) y `website/static/logo.jpg` si no se usa.
