@@ -22,6 +22,7 @@ materials = Blueprint("materials", __name__)
 MAX_FILES = 5
 PER_PAGE = 12
 MAX_PAGE = 1_000_000
+MAX_INT = 2**63 - 1  # rango de INTEGER en SQLite
 NO_FILES_MSG = "Sube al menos un fichero."
 TOO_MANY_MSG = "Máximo 5 ficheros."
 
@@ -172,7 +173,7 @@ def _int_param(value, minimum=1):
         number = int(value)
     except (TypeError, ValueError):
         return None
-    return number if number >= minimum else None
+    return number if minimum <= number <= MAX_INT else None
 
 
 def _escape_like(text):

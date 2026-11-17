@@ -150,14 +150,14 @@ def test_pagination_12_per_page(app, client, user):
 
 @pytest.mark.parametrize("qs", ["pagina=0", "pagina=abc", "pagina=999", "asignatura=999999",
                                 "asignatura=x", "curso=xyz", "tipo=nope", "orden=hack",
-                                "pagina=-3", "pagina=99999999999999999999", "profesores=zz"])
+                                "pagina=-3", "asignatura=99999999999999999999", "pagina=99999999999999999999", "profesores=zz"])
 def test_malformed_params_never_500(app, client, user, qs):
     subject = _subject("Redes")
     _material(user, subject, "Alfa")
     response = client.get(f"/explorar?{qs}")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    if qs in ("pagina=999", "pagina=99999999999999999999"):
+    if qs == "pagina=999":
         assert "No hay material" in html
     elif qs != "profesores=zz":
         assert ">Alfa<" in html
@@ -200,3 +200,9 @@ def test_card_shows_teacher_badge_rating_and_file_count(app, client, user):
     assert "Redes · 3º · Apuntes" in html
     assert "—" in html  # Beta sin valoraciones
     assert f"/material/{material.id}" in html
+
+
+@pytest.mark.parametrize("path", ["/material/99999999999999999999",
+                                  "/material/99999999999999999999/editar"])
+def test_huge_int_url_segment_is_404_not_500(client, user, path):
+    assert client.get(path).status_code == 404

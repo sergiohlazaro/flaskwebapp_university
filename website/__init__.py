@@ -61,6 +61,16 @@ def create_app(test_config=None):
         # SEC-07: un usuario bloqueado pierde la sesión en la siguiente petición.
         return None if user is None or user.is_blocked else user
 
+    from werkzeug.routing import IntegerConverter
+
+    class BoundedIntConverter(IntegerConverter):
+        """Como `int`, pero fuera del rango de SQLite (64 bits) no casa: 404 en vez de 500."""
+
+        def __init__(self, map, fixed_digits=0, min=None, max=2**63 - 1, signed=False):
+            super().__init__(map, fixed_digits=fixed_digits, min=min, max=max, signed=signed)
+
+    app.url_map.converters["int"] = BoundedIntConverter
+
     from .blueprints.admin import admin
     from .blueprints.auth import auth
     from .blueprints.files import files
