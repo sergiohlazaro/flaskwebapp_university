@@ -100,3 +100,26 @@ def test_subject_name_unique_case_insensitive(app):
     with pytest.raises(IntegrityError):
         db.session.commit()
     db.session.rollback()
+
+
+def test_subject_name_unique_case_insensitive_accented_initial(app):
+    db.session.add(Subject(name="Álgebra"))
+    db.session.commit()
+    db.session.add(Subject(name="álgebra"))
+    with pytest.raises(IntegrityError):
+        db.session.commit()
+    db.session.rollback()
+
+
+def test_subject_name_is_stripped_and_key_follows_changes(app):
+    subject = Subject(name="  Álgebra ")
+    db.session.add(subject)
+    db.session.commit()
+    assert subject.name == "Álgebra"
+    subject.name = "Física"
+    db.session.commit()
+    assert subject.name_key == "física"
+    db.session.add(Subject(name="FÍSICA"))
+    with pytest.raises(IntegrityError):
+        db.session.commit()
+    db.session.rollback()

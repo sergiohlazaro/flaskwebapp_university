@@ -4,7 +4,8 @@ import enum
 from datetime import UTC, datetime
 
 from flask_login import UserMixin
-from sqlalchemy import CheckConstraint, Index, func
+from sqlalchemy import CheckConstraint
+from sqlalchemy.orm import validates
 from sqlalchemy.sql import func as sql_func
 
 from .extensions import db
@@ -86,11 +87,16 @@ class User(UserMixin, db.Model):
 class Subject(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
+    # Clave normalizada (casefold) para unicidad sin distinguir mayúsculas,
+    # también con letras no ASCII (lower() de SQLite no las pliega).
+    name_key = db.Column(db.String(120), nullable=False, unique=True)
     is_archived = db.Column(db.Boolean, nullable=False, default=False)
 
-    __table_args__ = (
-        Index("uq_subject_name_lower", func.lower(name), unique=True),
-    )
+    @validates("name")
+    def _normalize_name(self, _key, value):
+        value = value.strip()
+        self.name_key = value.casefold()
+        return value
 
 
 class Material(db.Model):
