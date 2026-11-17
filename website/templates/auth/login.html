@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Iniciar sesión · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card"><div class="card-body p-4">
+            <h1 class="h3 text-center mb-4">Iniciar sesión</h1>
+            <form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}" novalidate>
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.email.label(class="form-label") }}
+                    {{ form.email(class="form-control" ~ (" is-invalid" if form.email.errors else ""), type="email", autocomplete="email", placeholder="tu@correo.es") }}
+                    {% for e in form.email.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.password.label(class="form-label") }}
+                    {{ form.password(class="form-control" ~ (" is-invalid" if form.password.errors else ""), autocomplete="current-password") }}
+                    {% for e in form.password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Iniciar sesión</button>
+            </form>
+            <p class="text-center mt-3 mb-0"><a href="{{ url_for('auth.signup') }}">¿No tienes cuenta? Regístrate</a></p>
+        </div></div>
+    </div>
+</div>
+{% endblock %}

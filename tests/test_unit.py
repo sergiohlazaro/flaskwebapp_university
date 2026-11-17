@@ -50,40 +50,40 @@ def test_signup_success(client):
     """
     TC-001: Registro exitoso con datos válidos.
     """
-    response = client.post("/signup", data={
+    response = client.post("/registro", data={
         "name": "Test",
         "surname": "User",
         "email": "testuser@example.com",
         "password": "password123",
         "password2": "password123"
     }, follow_redirects=True)
-    assert b"Account created successfully" in response.data
+    assert b"Cuenta creada correctamente" in response.data
 
 def test_signup_duplicate(client, user):
     """
     TC-002: Registro con email duplicado.
     """
-    response = client.post("/signup", data={
+    response = client.post("/registro", data={
         "name": "Test",
         "surname": "User",
         "email": "unit@example.com",
         "password": "password123",
         "password2": "password123"
     }, follow_redirects=True)
-    assert b"Email already exists" in response.data
+    assert b"Ya existe una cuenta con ese email." in response.data
 
 def test_signup_password_mismatch(client):
     """
     TC-003: Registro con contraseñas que no coinciden.
     """
-    response = client.post("/signup", data={
+    response = client.post("/registro", data={
         "name": "Test",
         "surname": "User",
         "email": "mismatch@example.com",
         "password": "password123",
         "password2": "password456"
     }, follow_redirects=True)
-    assert b"Passwords do not match" in response.data
+    assert "Las contraseñas no coinciden.".encode() in response.data
 
 # --------- LOGIN ---------
 
@@ -95,7 +95,7 @@ def test_login_success(client, user):
         "email": user.email,
         "password": "password123"
     }, follow_redirects=True)
-    assert b"Logged in successfully" in response.data
+    assert "Sesión iniciada correctamente".encode() in response.data
 
 def test_login_nonexistent_email(client):
     """
@@ -105,7 +105,7 @@ def test_login_nonexistent_email(client):
         "email": "noexist@example.com",
         "password": "password123"
     }, follow_redirects=True)
-    assert b"Email does not exist" in response.data
+    assert "Email o contraseña incorrectos.".encode() in response.data
 
 def test_login_wrong_password(client, user):
     """
@@ -115,7 +115,7 @@ def test_login_wrong_password(client, user):
         "email": user.email,
         "password": "wrongpassword"
     }, follow_redirects=True)
-    assert b"Incorrect password" in response.data
+    assert "Email o contraseña incorrectos.".encode() in response.data
 
 # --------- PUBLICACIONES ---------
 
@@ -197,4 +197,4 @@ def test_access_publications_without_login(client):
     TC-008: Acceder a publicaciones sin iniciar sesión.
     """
     response = client.get("/publications", follow_redirects=True)
-    assert b"Login" in response.data  # Verifica que se redirige a login
+    assert "Iniciar sesión".encode() in response.data  # Verifica que se redirige a login

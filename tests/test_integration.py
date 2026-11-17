@@ -40,7 +40,7 @@ def client(app):
 
 def register_user(client, name, surname, email, password):
     # Función auxiliar para registrar usuarios y hacer logout para evitar sesiones abiertas
-    client.post("/signup", data={
+    client.post("/registro", data={
         "name": name,
         "surname": surname,
         "email": email,
@@ -61,7 +61,7 @@ def test_register_login_create_publication(client):
         "email": "integration@example.com",
         "password": "password123"
     }, follow_redirects=True)
-    assert b"Logged in successfully" in response.data
+    assert "Sesión iniciada correctamente".encode() in response.data
 
     # TC-019: Crear publicación con contenido válido
     response = client.post("/publications", data={
@@ -98,7 +98,8 @@ def test_admin_block_unblock_user_flow(client, app):
 
     # TC-007: Intento de login por parte de usuario bloqueado
     response = client.post("/login", data={"email": "user@example.com", "password": "userpass"}, follow_redirects=True)
-    assert b"This account has been blocked" in response.data
+    assert "Email o contraseña incorrectos.".encode() in response.data
+    assert client.get("/home").status_code == 302  # la cuenta bloqueada no obtiene sesión
 
     # Login como admin de nuevo
     client.post("/login", data={"email": "admin@example.com", "password": "adminpass"}, follow_redirects=True)
@@ -112,4 +113,4 @@ def test_admin_block_unblock_user_flow(client, app):
 
     # Verificación de login exitoso después del desbloqueo
     response = client.post("/login", data={"email": "user@example.com", "password": "userpass"}, follow_redirects=True)
-    assert b"Logged in successfully" in response.data
+    assert "Sesión iniciada correctamente".encode() in response.data

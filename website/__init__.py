@@ -57,9 +57,11 @@ def create_app(test_config=None):
 
     @login_manager.user_loader
     def load_user(id):
-        return db.session.get(User, int(id))
+        user = db.session.get(User, int(id))
+        # SEC-07: un usuario bloqueado pierde la sesión en la siguiente petición.
+        return None if user is None or user.is_blocked else user
 
-    from .auth import auth
+    from .blueprints.auth import auth
     from .blueprints.files import files
     from .blueprints.main import main
     from .views import views

@@ -186,8 +186,9 @@ def test_sec03_legacy_default_admin_credentials_cannot_log_in(app, client):
                         password=generate_password_hash("admin"), role=0))
     db.session.commit()
 
-    client.post("/login", data={"email": "admin@admin.com", "password": "admin"})
+    response = client.post("/login", data={"email": "admin@admin.com", "password": "admin"})
 
+    assert "Las credenciales por defecto están desactivadas" in response.get_data(as_text=True)
     assert client.get("/admin").status_code == 302  # no hay sesión: redirige a login
 
 
