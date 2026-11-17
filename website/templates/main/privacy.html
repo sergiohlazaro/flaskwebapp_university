@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Política de privacidad · {{ app_name }}{% endblock %}
+{% block content %}
+<article class="prose">
+    <h1 class="h2">Política de privacidad</h1>
+    <h2 class="h5 mt-4">Datos que guardamos</h2>
+    <p>Nombre, apellidos, correo electrónico, contraseña (almacenada de forma cifrada), la foto y la biografía opcionales de tu perfil, tus materiales, comentarios, valoraciones y mensajes, y un registro de las direcciones IP desde las que inicias sesión.</p>
+    <h2 class="h5 mt-4">Para qué los usamos</h2>
+    <p>Solo para hacer funcionar el servicio y mantenerlo seguro. No vendemos ni cedemos tus datos a terceros.</p>
+    <h2 class="h5 mt-4">Tus derechos</h2>
+    <p>Puedes editar tus datos en «Mi cuenta» y eliminar tu cuenta en cualquier momento; tus datos personales se borrarán con ella. Para cualquier otra consulta, escríbenos desde la página de <a href="{{ url_for('main.contact') }}">contacto</a>.</p>
+</article>
+{% endblock %}

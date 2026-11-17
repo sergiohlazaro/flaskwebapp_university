@@ -1,0 +1,18 @@
+{# Uso: include con `page`, `pages` y `page_url(n)` (callable que devuelve la URL de la página n). #}
+{% if pages > 1 %}
+<nav aria-label="Paginación">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {{ 'disabled' if page <= 1 }}">
+            <a class="page-link" href="{{ page_url(page - 1) if page > 1 else '#' }}">Anterior</a>
+        </li>
+        {% for n in range(1, pages + 1) %}
+        <li class="page-item {{ 'active' if n == page }}">
+            <a class="page-link" href="{{ page_url(n) }}">{{ n }}</a>
+        </li>
+        {% endfor %}
+        <li class="page-item {{ 'disabled' if page >= pages }}">
+            <a class="page-link" href="{{ page_url(page + 1) if page < pages else '#' }}">Siguiente</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}

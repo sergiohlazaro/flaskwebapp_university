@@ -47,7 +47,7 @@ def register_user(client, name, surname, email, password):
         "password": password,
         "password2": password
     }, follow_redirects=True)
-    client.get("/logout", follow_redirects=True)
+    client.post("/logout", follow_redirects=True)
 
 # --------- INTEGRACIÓN: Registro + Login + Publicación ---------
 # Casos de prueba: TC-001, TC-004, TC-019
@@ -94,7 +94,7 @@ def test_admin_block_unblock_user_flow(client, app):
     assert b"User blocked" in response.data
 
     # Logout admin
-    client.get("/logout", follow_redirects=True)
+    client.post("/logout", follow_redirects=True)
 
     # TC-007: Intento de login por parte de usuario bloqueado
     response = client.post("/login", data={"email": "user@example.com", "password": "userpass"}, follow_redirects=True)
@@ -108,7 +108,7 @@ def test_admin_block_unblock_user_flow(client, app):
     assert b"User has been unblocked" in response.data
 
     # Logout admin
-    client.get("/logout", follow_redirects=True)
+    client.post("/logout", follow_redirects=True)
 
     # Verificación de login exitoso después del desbloqueo
     response = client.post("/login", data={"email": "user@example.com", "password": "userpass"}, follow_redirects=True)

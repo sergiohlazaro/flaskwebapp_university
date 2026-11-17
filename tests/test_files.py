@@ -74,10 +74,10 @@ def test_hidden_material_file_forbidden_for_others(app, client):
     fid = _material(author, hidden=True)
     login(client, "o@x.com")
     assert client.get(f"/archivos/material/{fid}").status_code == 403
-    client.get("/logout")
+    client.post("/logout")
     login(client, "a@x.com")
     assert client.get(f"/archivos/material/{fid}").status_code == 200
-    client.get("/logout")
+    client.post("/logout")
     login(client, "admin@x.com")
     assert client.get(f"/archivos/material/{fid}").status_code == 200
 
@@ -132,10 +132,10 @@ def test_message_file_only_sender_or_receiver(app, client):
     assert client.get(f"/archivos/mensaje/{mid}").status_code == 302
     login(client, "t@x.com")
     assert client.get(f"/archivos/mensaje/{mid}").status_code == 403
-    client.get("/logout")
+    client.post("/logout")
     login(client, "s@x.com")
     assert client.get(f"/archivos/mensaje/{mid}").status_code == 200
-    client.get("/logout")
+    client.post("/logout")
     login(client, "r@x.com")
     resp = client.get(f"/archivos/mensaje/{mid}")
     assert resp.status_code == 200 and b"%PDF-1 msg" in resp.data

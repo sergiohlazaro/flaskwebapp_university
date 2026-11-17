@@ -1,7 +1,7 @@
 import os
 import secrets
 
-from flask import Flask
+from flask import Flask, Response, redirect, request, url_for
 from flask_compress import Compress
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -20,6 +20,7 @@ def create_app(test_config=None):
     if test_config and test_config.get("TESTING"):
         env = "testing"
     app.config.from_object(get_config(env))
+    app.config["ENV_NAME"] = env
     app.config["UPLOAD_ROOT"] = os.path.join(app.instance_path, "uploads")
 
     # SECRET_KEY: nunca en el código. En producción es obligatoria; en otros
@@ -60,11 +61,13 @@ def create_app(test_config=None):
 
     from .auth import auth
     from .blueprints.files import files
+    from .blueprints.main import main
     from .views import views
 
     app.register_blueprint(views, url_prefix="/")
     app.register_blueprint(auth, url_prefix="/")
     app.register_blueprint(files)
+    app.register_blueprint(main)
 
     # No se crean usuarios por defecto. El primer administrador se crea con:
     #   flask --app main create-admin
@@ -78,5 +81,22 @@ def create_app(test_config=None):
     from .filters import register_filters
 
     register_filters(app)
+
+    from .services.headers import register_security_headers
+
+    register_security_headers(app)
+
+    @app.context_processor
+    def inject_globals():
+        # Task 13 hará real el contador de mensajes sin leer.
+        return {"app_name": app.config["APP_NAME"], "unread_messages_count": 0}
+
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        # Peticiones htmx: 401 + HX-Redirect para no incrustar el login en un fragmento.
+        target = url_for("auth.login", next=request.full_path.rstrip("?"))
+        if request.headers.get("HX-Request"):
+            return Response("", status=401, headers={"HX-Redirect": target})
+        return redirect(target)
 
     return app

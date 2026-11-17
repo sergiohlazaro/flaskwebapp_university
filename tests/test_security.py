@@ -225,7 +225,7 @@ def _static(app, *parts):
 
 
 def _logout(client):
-    client.get("/logout")
+    client.post("/logout")
 
 
 def test_sec05_profile_pic_named_default_does_not_overwrite_shared_default(app, client):

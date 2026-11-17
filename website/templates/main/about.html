@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Sobre nosotros · {{ app_name }}{% endblock %}
+{% block content %}
+<article class="prose">
+    <h1 class="h2">Sobre nosotros</h1>
+    <p>{{ app_name }} es una biblioteca de material de estudio hecha por y para estudiantes. Nació como un proyecto personal para que los apuntes dejen de perderse en carpetas y chats.</p>
+    <p>Aquí puedes subir tus apuntes, ejercicios y resúmenes, descubrir el material de otros compañeros, valorarlo, guardarlo y comentar tus dudas. Los profesores pueden identificarse con una etiqueta para que su material sea fácil de reconocer.</p>
+    <p>Si tienes ideas o encuentras algún problema, escríbenos desde la página de <a href="{{ url_for('main.contact') }}">contacto</a>.</p>
+</article>
+{% endblock %}

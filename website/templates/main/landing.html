@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ app_name }} · Apuntes compartidos entre estudiantes{% endblock %}
+{% block content %}
+<section class="hero text-center py-5">
+    <h1 class="display-5 fw-bold">Los apuntes de tu carrera, en un solo lugar</h1>
+    <p class="lead text-secondary mx-auto hero-lead">Comparte tus apuntes, encuentra el material que necesitas y resuelve dudas con tus compañeros y profesores.</p>
+    <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
+        <a class="btn btn-primary btn-lg" href="{{ url_for('auth.sign_up') }}">Crear cuenta</a>
+        <a class="btn btn-outline-primary btn-lg" href="{{ url_for('auth.login') }}">Iniciar sesión</a>
+    </div>
+</section>
+<section class="row g-3 py-4">
+    <div class="col-md-4">
+        <div class="card feature-card h-100"><div class="card-body text-center">
+            <i class="bi bi-share feature-icon" aria-hidden="true"></i>
+            <h2 class="h5 mt-2">Comparte apuntes</h2>
+            <p class="text-secondary mb-0">Sube tus resúmenes, ejercicios y exámenes para que otros estudiantes los aprovechen.</p>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card feature-card h-100"><div class="card-body text-center">
+            <i class="bi bi-search feature-icon" aria-hidden="true"></i>
+            <h2 class="h5 mt-2">Encuentra por asignatura</h2>
+            <p class="text-secondary mb-0">Filtra por asignatura, curso y tipo de material y ordena por valoración o novedad.</p>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card feature-card h-100"><div class="card-body text-center">
+            <i class="bi bi-chat-dots feature-icon" aria-hidden="true"></i>
+            <h2 class="h5 mt-2">Pregunta en los comentarios</h2>
+            <p class="text-secondary mb-0">Resuelve dudas directamente en cada material, con la ayuda de la comunidad.</p>
+        </div></div>
+    </div>
+</section>
+{% endblock %}

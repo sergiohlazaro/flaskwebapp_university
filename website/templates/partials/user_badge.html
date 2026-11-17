@@ -1,0 +1,3 @@
+{% macro user_badge(user) -%}
+<span class="user-badge">{{ user.display_name }}{% if user.is_teacher %} <span class="badge badge-teacher">Profesor/a</span>{% endif %}</span>
+{%- endmacro %}

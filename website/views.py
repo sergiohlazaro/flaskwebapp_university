@@ -59,34 +59,10 @@ def unique_filename(original_name):
 # RUTAS PRINCIPALES (HOME, ABOUT, CONTACT)
 # ---------------------------------
 
-@views.route('/')
-def mainw():
-    return render_template("mainw.html", user=current_user)
-
 @views.route('/home')
 @login_required
 def home():
-    return render_template("home.html", user=current_user)
-
-@views.route('/about')
-def about():
-    return render_template("about.html", user=current_user)
-
-@views.route('/contact')
-def contact():
-    return render_template("contact.html", user=current_user)
-
-@views.route('/legal')
-def legal():
-    return render_template("legal.html", user=current_user)
-
-@views.route('/privacy')
-def privacy():
-    return render_template("privacy.html", user=current_user)
-
-@views.route('/cookies')
-def cookies():
-    return render_template("cookies.html", user=current_user)
+    return render_template("legacy/home.html", user=current_user)
 
 # ---------------------------------
 # PERFIL DE USUARIO (EDITAR PERFIL)
@@ -110,12 +86,12 @@ def profile():
         if new_email and confirm_email:
             if new_email != confirm_email:
                 flash('Emails do not match', category='error')
-                return render_template('profile.html', user=current_user)
+                return render_template('legacy/profile.html', user=current_user)
 
             existing_user = User.query.filter_by(email=new_email).first()
             if existing_user:
                 flash('Email already exists', category='error')
-                return render_template('profile.html', user=current_user)
+                return render_template('legacy/profile.html', user=current_user)
             else:
                 current_user.email = new_email
                 logging.info(f"User {current_user.id} updated email to {new_email}")
@@ -128,13 +104,13 @@ def profile():
         if current_password and new_password and confirm_password:
             if not check_password_hash(current_user.password, current_password):
                 flash('Current password is incorrect', category='error')
-                return render_template('profile.html', user=current_user)
+                return render_template('legacy/profile.html', user=current_user)
             if len(new_password) < 8:
                 flash('New password must be at least 8 characters long', category='error')
-                return render_template('profile.html', user=current_user)
+                return render_template('legacy/profile.html', user=current_user)
             if new_password != confirm_password:
                 flash('New passwords do not match', category='error')
-                return render_template('profile.html', user=current_user)
+                return render_template('legacy/profile.html', user=current_user)
             else:
                 current_user.password = generate_password_hash(new_password, method='pbkdf2:sha256')
                 logging.info(f"User {current_user.id} updated password.")
@@ -144,18 +120,18 @@ def profile():
             file = request.files['profile_pic']
             if file.filename == '':
                 flash('No selected file', category='error')
-                return render_template('profile.html', user=current_user)
+                return render_template('legacy/profile.html', user=current_user)
             try:
                 saved = save_avatar(file)
             except UploadError:
                 flash('Invalid image file type.', category='error')
-                return render_template('profile.html', user=current_user)
+                return render_template('legacy/profile.html', user=current_user)
             current_user.avatar = saved.stored_name
 
         db.session.commit()
         flash('Profile updated successfully.', category='success')
 
-    return render_template('profile.html', user=current_user)
+    return render_template('legacy/profile.html', user=current_user)
 
 # ---------------------------------
 # ACTUALIZAR BIOGRAFÍA
@@ -172,7 +148,7 @@ def update_bio():
         current_user.bio = bio
         db.session.commit()
         flash('Your bio has been updated.', category='success')
-    return render_template('profile.html', user=current_user)
+    return render_template('legacy/profile.html', user=current_user)
 
 # ---------------------------------
 # ACTUALIZAR REDES SOCIALES
@@ -187,7 +163,7 @@ def update_social_links():
     current_user.linkedin = bleach.clean(linkedin)
     db.session.commit()
     flash('Social media links updated.', category='success')
-    return render_template('profile.html', user=current_user)
+    return render_template('legacy/profile.html', user=current_user)
 
 # ---------------------------------
 # ELIMINAR CUENTA
@@ -243,7 +219,7 @@ def admin():
     login_records = LoginRecord.query.all()
 
     # Renderizar panel de administración
-    return render_template('admin.html', user=current_user, users=users, login_records=login_records)
+    return render_template('legacy/admin.html', user=current_user, users=users, login_records=login_records)
 
 # ---------------------------------
 # BLOQUEAR Y DESBLOQUEAR USUARIOS (Solo Admin)
@@ -344,7 +320,7 @@ def publications():
     per_page = 8
     user_publications = Publication.query.filter_by(user_id=current_user.id).order_by(Publication.date.desc()).paginate(page=page, per_page=per_page)
 
-    return render_template("publications.html", user=current_user, user_publications=user_publications)
+    return render_template("legacy/publications.html", user=current_user, user_publications=user_publications)
 
 
 
@@ -390,10 +366,10 @@ def viewuser(email):
             .order_by(Publication.date.desc())\
             .paginate(page=page, per_page=per_page)
 
-        return render_template("publications.html", user=user, user_publications=user_publications)
+        return render_template("legacy/publications.html", user=user, user_publications=user_publications)
     else:
         flash('User not found', category='error')
-        return render_template("userlist.html", user=current_user)
+        return render_template("legacy/userlist.html", user=current_user)
 
 # ---------------------------------
 # LISTA DE USUARIOS
@@ -406,7 +382,7 @@ def userlist():
     Muestra la lista de todos los usuarios excepto el actual.
     """
     users = User.query.filter(User.id != current_user.id).all()
-    return render_template("userlist.html", users=users, user=current_user)
+    return render_template("legacy/userlist.html", users=users, user=current_user)
 
 # ---------------------------------
 # MENSAJES PRIVADOS ENTRE USUARIOS
@@ -440,7 +416,7 @@ def messages():
         ).order_by(Message.created_at).all()
 
     return render_template(
-        'messages.html',
+        'legacy/messages.html',
         user=current_user,
         users_contacted=users_contacted,
         conversation=conversation,

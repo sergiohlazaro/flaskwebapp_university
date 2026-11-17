@@ -55,7 +55,7 @@ def login():
             # Si está dentro del tiempo de bloqueo, rechazar
             if time.time() - last_attempt_time < BLOCK_TIME_SECONDS:
                 flash("Too many failed login attempts. Try again later.", category='error')
-                return render_template("login.html", user=current_user)
+                return render_template("legacy/login.html", user=current_user)
             else:
                 # Si pasó el tiempo de bloqueo, resetear intentos
                 FAILED_LOGINS[ip_address] = [0, 0]
@@ -107,7 +107,7 @@ def login():
                 # Registrar intento fallido
                 FAILED_LOGINS[ip_address] = [FAILED_LOGINS.get(ip_address, [0, 0])[0] + 1, time.time()]
 
-    return render_template("login.html", user=current_user)
+    return render_template("legacy/login.html", user=current_user)
 
 # -----------------------
 # SIGN UP (Registro)
@@ -167,19 +167,19 @@ def sign_up():
             db.session.add(login_record)
             db.session.commit()
 
-            return render_template("home.html", user=current_user)
+            return render_template("legacy/home.html", user=current_user)
 
-    return render_template("sign_up.html", user=current_user)
+    return render_template("legacy/sign_up.html", user=current_user)
 
 # -----------------------
 # LOGOUT
 # -----------------------
 
-@auth.route('/logout')
+@auth.route('/logout', methods=['POST'])
 @login_required  # Solo usuarios autenticados pueden hacer logout
 def logout():
     # Cierra la sesión del usuario actual
     logout_user()
 
-    # Redirige al login
-    return redirect(url_for('auth.login'))
+    # Redirige a la portada
+    return redirect('/')
