@@ -3,8 +3,16 @@
 import unicodedata
 
 from flask_wtf import FlaskForm
-from wtforms import PasswordField, StringField
-from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
+from flask_wtf.file import MultipleFileField
+from wtforms import PasswordField, SelectField, StringField, TextAreaField
+from wtforms.validators import (
+    DataRequired,
+    Email,
+    EqualTo,
+    Length,
+    Optional,
+    ValidationError,
+)
 
 REQUIRED = "Este campo es obligatorio."
 
@@ -61,3 +69,35 @@ class SubjectForm(FlaskForm):
         DataRequired("Escribe el nombre de la asignatura."),
         Length(min=1, max=100, message="El nombre debe tener entre 1 y 100 caracteres."),
     ])
+
+
+def _int_or_zero(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+class _ChoiceField(SelectField):
+    def pre_validate(self, form):
+        if self.data not in {value for value, _label in self.choices}:
+            raise ValidationError("Selecciona una opción válida.")
+
+
+class MaterialForm(FlaskForm):
+    title = StringField("Título", filters=[_normalize_text], validators=[
+        DataRequired("Escribe un título."),
+        Length(min=3, max=150, message="El título debe tener entre 3 y 150 caracteres."),
+    ])
+    description = TextAreaField("Descripción", filters=[_strip], validators=[
+        Optional(),
+        Length(max=5000, message="La descripción no puede superar los 5000 caracteres."),
+    ])
+    subject_id = _ChoiceField("Asignatura", coerce=_int_or_zero)
+    course = _ChoiceField("Curso", coerce=str)
+    kind = _ChoiceField("Tipo", coerce=str)
+    files = MultipleFileField("Ficheros")
+
+    def validate_subject_id(self, field):
+        if not field.data:
+            raise ValidationError("Selecciona una asignatura.")

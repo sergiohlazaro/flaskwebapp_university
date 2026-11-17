@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% set heading = "Editar material" if material else "Subir material" %}
+{% block title %}{{ heading }} · {{ app_name }}{% endblock %}
+{% macro field_errors(field) %}{% for e in field.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}{% endmacro %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <h1 class="h3 mb-3">{{ heading }}</h1>
+        <div class="card mb-3"><div class="card-body p-4">
+            <form method="post" enctype="multipart/form-data" novalidate>
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.title.label(class="form-label") }}
+                    {{ form.title(class="form-control" ~ (" is-invalid" if form.title.errors else ""), maxlength=150) }}
+                    {{ field_errors(form.title) }}
+                </div>
+                <div class="mb-3">
+                    {{ form.description.label(class="form-label") }}
+                    {{ form.description(class="form-control" ~ (" is-invalid" if form.description.errors else ""), rows=5, maxlength=5000) }}
+                    {{ field_errors(form.description) }}
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        {{ form.subject_id.label(class="form-label") }}
+                        {{ form.subject_id(class="form-select" ~ (" is-invalid" if form.subject_id.errors else "")) }}
+                        {{ field_errors(form.subject_id) }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ form.course.label(class="form-label") }}
+                        {{ form.course(class="form-select" ~ (" is-invalid" if form.course.errors else "")) }}
+                        {{ field_errors(form.course) }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ form.kind.label(class="form-label") }}
+                        {{ form.kind(class="form-select" ~ (" is-invalid" if form.kind.errors else "")) }}
+                        {{ field_errors(form.kind) }}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    {{ form.files.label(class="form-label") }}
+                    {{ form.files(class="form-control" ~ (" is-invalid" if form.files.errors else ""), multiple=True) }}
+                    <div class="form-text">De 1 a 5 ficheros (pdf, doc, docx, ppt, pptx, xls, xlsx, odt, odp, txt, md, zip, png, jpg, jpeg, gif).</div>
+                    {{ field_errors(form.files) }}
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg" aria-hidden="true"></i> Guardar</button>
+                {% if material %}<a class="btn btn-outline-secondary" href="{{ url_for('materials.detail', material_id=material.id) }}">Cancelar</a>{% endif %}
+            </form>
+        </div></div>
+
+        {% if material %}
+        <div class="card mb-3"><div class="card-body">
+            <h2 class="h5">Ficheros actuales</h2>
+            <ul class="list-group list-group-flush">
+                {% for f in material.files %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-file-earmark" aria-hidden="true"></i> {{ f.original_name }}</span>
+                    <form method="post" action="{{ url_for('materials.remove_file', material_id=material.id, file_id=f.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Quitar</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+        </div></div>
+        <form method="post" action="{{ url_for('materials.delete', material_id=material.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash" aria-hidden="true"></i> Borrar material</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

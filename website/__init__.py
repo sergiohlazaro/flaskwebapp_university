@@ -65,6 +65,7 @@ def create_app(test_config=None):
     from .blueprints.auth import auth
     from .blueprints.files import files
     from .blueprints.main import main
+    from .blueprints.materials import materials
     from .views import views
 
     app.register_blueprint(views, url_prefix="/")
@@ -72,6 +73,7 @@ def create_app(test_config=None):
     app.register_blueprint(files)
     app.register_blueprint(main)
     app.register_blueprint(admin)
+    app.register_blueprint(materials)
 
     # No se crean usuarios por defecto. El primer administrador se crea con:
     #   flask --app main create-admin
