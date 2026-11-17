@@ -42,6 +42,8 @@
     ```bash
     flask --app main create-admin --email tu-email@ejemplo.com
 
+    > Si actualizas desde una versión anterior, las cuentas `admin@admin.com` y `user1@user.com` con sus contraseñas por defecto ya no pueden iniciar sesión. Crea un administrador nuevo con el comando anterior y elimina esas cuentas.
+
 6. **Inicia la aplicación:**
 
     ```bash

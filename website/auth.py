@@ -30,6 +30,12 @@ FAILED_LOGINS = {}
 MAX_FAILED_ATTEMPTS = 5
 BLOCK_TIME_SECONDS = 600  # 10 minutos bloqueado tras superar el límite
 
+# Cuentas que versiones anteriores creaban automáticamente con contraseñas públicas.
+LEGACY_DEFAULT_CREDENTIALS = {
+    'admin@admin.com': 'admin',
+    'user1@user.com': 'password1',
+}
+
 # -----------------------
 # LOGIN
 # -----------------------
@@ -70,6 +76,13 @@ def login():
         # Usuario bloqueado
         elif user.is_blocked:
             flash('This account has been blocked', category='error')
+
+        # Credenciales por defecto publicadas por versiones anteriores (SEC-03):
+        # se rechazan aunque la contraseña coincida en una BD antigua.
+        elif LEGACY_DEFAULT_CREDENTIALS.get(email) == password:
+            flash('Default credentials are disabled. Ask an administrator to create '
+                  'a new account (flask create-admin).', category='error')
+            FAILED_LOGINS[ip_address] = [FAILED_LOGINS.get(ip_address, [0, 0])[0] + 1, time.time()]
 
         # Usuario existe y no está bloqueado
         else:

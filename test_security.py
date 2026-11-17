@@ -178,6 +178,18 @@ def test_sec03_app_start_does_not_seed_default_accounts(tmp_path):
         assert User.query.count() == 0
 
 
+def test_sec03_legacy_default_admin_credentials_cannot_log_in(app, client):
+    from werkzeug.security import generate_password_hash
+    # Simula una BD existente creada por la versión anterior (seed admin/admin)
+    db.session.add(User(name="admin", surname="admin", email="admin@admin.com",
+                        password=generate_password_hash("admin"), role=0))
+    db.session.commit()
+
+    client.post("/login", data={"email": "admin@admin.com", "password": "admin"})
+
+    assert client.get("/admin").status_code == 302  # no hay sesión: redirige a login
+
+
 def test_sec03_create_admin_command_creates_admin_with_given_password(app):
     from werkzeug.security import check_password_hash
     runner = app.test_cli_runner()
