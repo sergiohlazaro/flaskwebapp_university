@@ -59,10 +59,12 @@ def create_app(test_config=None):
         return db.session.get(User, int(id))
 
     from .auth import auth
+    from .blueprints.files import files
     from .views import views
 
     app.register_blueprint(views, url_prefix="/")
     app.register_blueprint(auth, url_prefix="/")
+    app.register_blueprint(files)
 
     # No se crean usuarios por defecto. El primer administrador se crea con:
     #   flask --app main create-admin

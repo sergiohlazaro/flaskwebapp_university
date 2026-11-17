@@ -15,11 +15,7 @@
 
     <div class="d-flex align-items-center mb-4">
         <div class="me-3">
-            {% if user.avatar %}
-                <img src="{{ url_for('static', filename='profile_pics/' + user.avatar) }}" alt="Profile Picture" class="profile-pic img-thumbnail">
-            {% else %}
-                <img src="{{ url_for('static', filename='profile_pics/default.jpg') }}" alt="Default Profile Picture" class="profile-pic img-thumbnail">
-            {% endif %}
+            <img src="{{ url_for('files.avatar', user_id=user.id) }}" alt="Profile Picture" class="profile-pic img-thumbnail">
         </div>
         <div>
             <h4 class="text-dark mb-1">{{ user.name }}</h4>

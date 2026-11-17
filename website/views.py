@@ -3,9 +3,8 @@
 # ---------------------------------
 import os  # Librería para operaciones con archivos y carpetas
 import uuid  # Nombres de fichero únicos para las subidas
-from functools import wraps  # Para construir decoradores (admin_required)
 from werkzeug.utils import secure_filename  # Asegura que los nombres de archivos sean seguros para guardarlos
-from flask import Blueprint, abort, current_app, json, jsonify, redirect, render_template, url_for, request, flash
+from flask import Blueprint, json, jsonify, redirect, render_template, url_for, request, flash
 from flask_login import login_required, current_user, logout_user  # Gestión de sesiones de usuarios
 
 
@@ -24,11 +23,12 @@ import bleach
 # Para logging de eventos
 import logging
 
-# Para procesamiento de imágenes y verificación del tipo real de archivos subidos
-from PIL import Image, UnidentifiedImageError
-
 # Importación del limitador de solicitudes (Rate Limiting) para prevenir ataques de fuerza bruta
 from .extensions import limiter
+
+# Servicios compartidos (permisos y almacenamiento privado de subidas)
+from .services.permissions import admin_required
+from .services.uploads import UploadError, save_avatar
 
 # ---------------------------------
 # CONFIGURACIONES
@@ -37,33 +37,12 @@ from .extensions import limiter
 # Creación del blueprint para agrupar todas las rutas de "views"
 views = Blueprint('views', __name__)
 
-# Extensiones permitidas para imágenes de perfil
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
 # Extensiones permitidas para archivos de publicaciones/mensajes
 ALLOWED_EXTENSIONS_DOCS = {'pdf', 'doc', 'docx', 'txt', 'png', 'jpg', 'jpeg', 'gif'}
-
-# Carpeta donde se guardarán las imágenes de perfil
-UPLOAD_FOLDER = 'website/static/profile_pics'
 
 # ---------------------------------
 # FUNCIONES DE UTILIDAD
 # ---------------------------------
-
-# Restringe una ruta a administradores (role == 0). Responde 403 al resto.
-# Debe colocarse DESPUÉS de @login_required para que current_user esté autenticado.
-def admin_required(view):
-    @wraps(view)
-    def wrapped(*args, **kwargs):
-        if current_user.role != 0:
-            current_app.logger.warning(f"Forbidden admin action by user {current_user.id} on {request.path}")
-            abort(403)
-        return view(*args, **kwargs)
-    return wrapped
-
-# Verifica si un archivo tiene una extensión válida para imágenes
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Verifica si un archivo tiene una extensión válida para archivos en general
 def allowed_file_generic(filename):
@@ -75,20 +54,6 @@ def allowed_file_generic(filename):
 def unique_filename(original_name):
     ext = secure_filename(original_name).rsplit('.', 1)[-1].lower()
     return f"{uuid.uuid4().hex}.{ext}"
-
-# Detecta el tipo real de una imagen a partir de su contenido (sustituye a imghdr,
-# eliminado en Python 3.13). Devuelve 'png', 'jpeg', 'gif'... o None si no es imagen.
-def detect_image_type(stream):
-    try:
-        with Image.open(stream) as image:
-            image.verify()
-            detected = (image.format or '').lower() or None
-            # Pillow identifica como 'MPO' los JPEG multi-imagen de muchos móviles
-            return 'jpeg' if detected == 'mpo' else detected
-    except (UnidentifiedImageError, OSError, SyntaxError):
-        return None
-    finally:
-        stream.seek(0)
 
 # ---------------------------------
 # RUTAS PRINCIPALES (HOME, ABOUT, CONTACT)
@@ -180,22 +145,12 @@ def profile():
             if file.filename == '':
                 flash('No selected file', category='error')
                 return render_template('profile.html', user=current_user)
-            if file and allowed_file(file.filename):
-                detected_type = detect_image_type(file.stream)
-                if detected_type in ALLOWED_EXTENSIONS:
-                    if not os.path.exists(UPLOAD_FOLDER):
-                        os.makedirs(UPLOAD_FOLDER)
-                    filename = unique_filename(file.filename)
-                    filepath = os.path.join(UPLOAD_FOLDER, filename)
-
-                    image = Image.open(file)
-                    image.thumbnail((300, 300))  # Redimensionar a máximo 300x300
-                    image.save(filepath)
-
-                    current_user.avatar = filename
-                else:
-                    flash('Invalid image file type.', category='error')
-                    return render_template('profile.html', user=current_user)
+            try:
+                saved = save_avatar(file)
+            except UploadError:
+                flash('Invalid image file type.', category='error')
+                return render_template('profile.html', user=current_user)
+            current_user.avatar = saved.stored_name
 
         db.session.commit()
         flash('Profile updated successfully.', category='success')

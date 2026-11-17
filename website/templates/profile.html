@@ -15,15 +15,7 @@
         ================================ -->
 
         <div class="col-md-4 text-center">
-            {% if user.avatar %}
-                <img src="{{ url_for('static', filename='profile_pics/' + user.avatar) }}" 
-                     alt="Profile Picture" 
-                     class="profile-pic img-thumbnail">
-            {% else %}
-                <img src="{{ url_for('static', filename='profile_pics/default.jpg') }}" 
-                     alt="Default Profile Picture" 
-                     class="profile-pic img-thumbnail">
-            {% endif %}
+            <img src="{{ url_for('files.avatar', user_id=user.id) }}" alt="Profile Picture" class="profile-pic img-thumbnail">
             <h4 class="mt-2">{{ user.name }} {{ user.surname }}</h4>
             {# Muestra la foto de perfil actual del usuario + su nombre completo #}
         </div>
