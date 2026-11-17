@@ -90,3 +90,13 @@ def test_logout_requires_post(app, client):
     assert r.status_code == 302
     assert r.headers["Location"] in ("/", "http://localhost/")
     assert client.get("/home").status_code == 302
+
+
+def test_navbar_links_for_logged_in_user(app, client):
+    user = make_user("nav@example.com")
+    login(client, "nav@example.com")
+    html = client.get("/sobre").get_data(as_text=True)
+    assert 'href="/material/nuevo"' in html
+    assert f'href="/u/{user.id}"' in html
+    assert "/materiales/nuevo" not in html
+    assert "/perfil" not in html
