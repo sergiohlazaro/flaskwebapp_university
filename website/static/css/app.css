@@ -124,3 +124,9 @@ body {
 
 /* Feed Explorar */
 .explore-filters .form-label { margin-bottom: 0.15rem; color: #6b7280; }
+
+/* Detalle de material, valoraciones y guardados */
+.material-description { white-space: pre-line; }
+.file-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: var(--app-radius, 8px); }
+.star-btn { font-size: 1.25rem; line-height: 1; }
+.card-actions { position: relative; z-index: 2; }

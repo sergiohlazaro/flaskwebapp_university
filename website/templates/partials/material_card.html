@@ -14,4 +14,8 @@
             {% if material.average_rating is not none %}{{ '%.1f'|format(material.average_rating)|replace('.', ',') }} ({{ material.rating_count }}){% else %}—{% endif %}
         </p>
     </div>
+    <div class="card-footer bg-transparent border-0 pt-0 card-actions">
+        {% set saved = favorite_ids is defined and material.id in favorite_ids %}
+        {% include "partials/favorite_button.html" %}
+    </div>
 </article>

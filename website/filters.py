@@ -38,6 +38,19 @@ def timeago(dt: datetime | None, now: datetime | None = None) -> str:
     return dt.astimezone(MADRID).strftime("%d/%m/%Y")
 
 
+def filesize(size: int | None) -> str:
+    """Tamaño legible con coma decimal: 2048 -> '2,0 KB'."""
+    value = float(size or 0)
+    if value < 1024:
+        return f"{int(value)} B"
+    for unit in ("KB", "MB", "GB"):
+        value /= 1024
+        if value < 1024 or unit == "GB":
+            return f"{value:.1f}".replace(".", ",") + f" {unit}"
+    return ""
+
+
 def register_filters(app) -> None:
+    app.jinja_env.filters["filesize"] = filesize
     app.jinja_env.filters["localtime"] = localtime
     app.jinja_env.filters["timeago"] = timeago

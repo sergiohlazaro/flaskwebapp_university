@@ -1,5 +1,69 @@
 {% extends "base.html" %}
+{% from "partials/user_badge.html" import user_badge %}
 {% block title %}{{ material.title }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1 class="h3">{{ material.title }}</h1>
+{% set is_author = material.author_id == current_user.id %}
+<article class="material-detail">
+    {% if material.is_hidden %}
+    <div class="alert alert-warning" role="status"><i class="bi bi-eye-slash" aria-hidden="true"></i> Oculto por moderación</div>
+    {% endif %}
+    <header class="mb-3">
+        <p class="material-meta text-uppercase small mb-1">
+            {{ material.subject.name }}{% if material.course %} · {{ material.course.value }}{% endif %}{% if material.kind %} · {{ material.kind.value }}{% endif %}
+        </p>
+        <h1 class="h3">{{ material.title }}</h1>
+        <p class="small text-secondary d-flex align-items-center gap-2 flex-wrap">
+            <img class="avatar-sm" src="{{ url_for('files.avatar', user_id=material.author.id) }}" alt="">
+            {{ user_badge(material.author) }}
+            <span>· {{ material.created_at|localtime }}{% if material.updated_at != material.created_at %} (editado){% endif %}</span>
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+            <div id="favorite-slot">{% include "partials/favorite_button.html" %}</div>
+            {% if is_author %}
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('materials.edit', material_id=material.id) }}"><i class="bi bi-pencil" aria-hidden="true"></i> Editar</a>
+            {% endif %}
+            {% if is_author or current_user.is_admin %}
+            <form method="post" action="{{ url_for('materials.delete', material_id=material.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Borrar</button>
+            </form>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if material.description %}
+    <section class="mb-4" aria-label="Descripción">
+        <p class="material-description">{{ material.description }}</p>
+    </section>
+    {% endif %}
+
+    <section class="mb-4" aria-labelledby="files-heading">
+        <h2 class="h5" id="files-heading">Ficheros</h2>
+        <ul class="list-group">
+            {% for file in material.files %}
+            <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                <span class="d-flex align-items-center gap-2">
+                    {% if file.mime.startswith('image/') %}
+                    <img class="file-thumb" src="{{ url_for('files.material_file', file_id=file.id) }}" alt="Vista previa de {{ file.original_name }}">
+                    {% else %}
+                    <i class="bi bi-file-earmark fs-4" aria-hidden="true"></i>
+                    {% endif %}
+                    <span>{{ file.original_name }} <span class="text-secondary small">({{ file.size|filesize }})</span></span>
+                </span>
+                <a class="btn btn-sm btn-primary" href="{{ url_for('files.material_file', file_id=file.id) }}"><i class="bi bi-download" aria-hidden="true"></i> Descargar</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section class="mb-4" aria-labelledby="rating-heading">
+        <h2 class="h5" id="rating-heading">Valoración</h2>
+        {% include "partials/rating.html" %}
+    </section>
+
+    {# Tarea 10: los comentarios se renderizan dentro de este contenedor. #}
+    <section id="comments" aria-labelledby="comments-heading">
+        <h2 class="h5" id="comments-heading">Comentarios</h2>
+    </section>
+</article>
 {% endblock %}

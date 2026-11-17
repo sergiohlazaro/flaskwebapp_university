@@ -1,13 +1,24 @@
 """Crear, editar y borrar material didáctico (spec §5.1, §5.2)."""
 from collections.abc import Mapping
+from urllib.parse import urlsplit
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import Select, func, or_, select
+from sqlalchemy.exc import IntegrityError
 
 from ..extensions import db
 from ..forms import MaterialForm
-from ..models import Course, Material, MaterialFile, MaterialKind, Rating, Subject, User
+from ..models import (
+    Course,
+    Favorite,
+    Material,
+    MaterialFile,
+    MaterialKind,
+    Rating,
+    Subject,
+    User,
+)
 from ..services.permissions import can_view_material
 from ..services.uploads import (
     ALLOWED_MATERIAL_EXTENSIONS,
@@ -106,13 +117,122 @@ def new():
     return _render(form)
 
 
-@materials.route("/material/<int:material_id>")
-@login_required
-def detail(material_id):
+def _visible_or_404(material_id):
     material = _get_or_404(material_id)
     if not can_view_material(current_user, material):
         abort(404)
-    return render_template("materials/detail.html", material=material)
+    return material
+
+
+def _rating_context(material):
+    mine = db.session.get(Rating, (current_user.id, material.id))
+    return {"material": material, "my_stars": mine.stars if mine else 0,
+            "can_rate": material.author_id != current_user.id}
+
+
+def _is_saved(material):
+    return db.session.get(Favorite, (current_user.id, material.id)) is not None
+
+
+def _favorite_ids(items):
+    """Ids de los materiales de la página que el usuario actual tiene guardados (una sola consulta)."""
+    ids = [m.id for m in items]
+    if not ids:
+        return set()
+    rows = db.session.scalars(select(Favorite.material_id).where(
+        Favorite.user_id == current_user.id, Favorite.material_id.in_(ids)))
+    return set(rows)
+
+
+def _internal_referrer():
+    referrer = request.referrer
+    if not referrer or "\\" in referrer:
+        return None
+    parts = urlsplit(referrer)
+    if parts.scheme or parts.netloc:
+        if parts.scheme not in ("http", "https") or parts.netloc != request.host:
+            return None
+    elif not referrer.startswith("/") or referrer.startswith("//"):
+        return None
+    return referrer
+
+
+def _back(material):
+    return redirect(_internal_referrer() or url_for("materials.detail", material_id=material.id))
+
+
+@materials.route("/material/<int:material_id>")
+@login_required
+def detail(material_id):
+    material = _visible_or_404(material_id)
+    return render_template("materials/detail.html", saved=_is_saved(material),
+                           **_rating_context(material))
+
+
+@materials.route("/material/<int:material_id>/valorar", methods=["POST"])
+@login_required
+def rate(material_id):
+    material = _visible_or_404(material_id)
+    if material.author_id == current_user.id:
+        abort(403)
+    stars = _int_param(request.form.get("stars"), minimum=0)
+    if stars is None or stars > 5:
+        abort(400)
+    for attempt in range(2):
+        rating = db.session.get(Rating, (current_user.id, material.id))
+        if stars == 0:
+            if rating is not None:
+                db.session.delete(rating)
+        elif rating is None:
+            db.session.add(Rating(user_id=current_user.id, material_id=material.id, stars=stars))
+        else:
+            rating.stars = stars
+        try:
+            db.session.commit()
+            break
+        except IntegrityError:
+            db.session.rollback()  # carrera: otro envío creó o borró la fila; se relee y se repite
+            if attempt:
+                raise
+    db.session.refresh(material)
+    if request.headers.get("HX-Request"):
+        return render_template("partials/rating.html", **_rating_context(material))
+    return _back(material)
+
+
+@materials.route("/material/<int:material_id>/guardar", methods=["POST"])
+@login_required
+def toggle_favorite(material_id):
+    material = _visible_or_404(material_id)
+    favorite = db.session.get(Favorite, (current_user.id, material.id))
+    try:
+        if favorite is None:
+            db.session.add(Favorite(user_id=current_user.id, material_id=material.id))
+        else:
+            db.session.delete(favorite)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()  # doble envío: ya estaba guardado
+    if request.headers.get("HX-Request"):
+        return render_template("partials/favorite_button.html", material=material, saved=_is_saved(material))
+    return _back(material)
+
+
+@materials.route("/guardados")
+@login_required
+def saved():
+    page = min(_int_param(request.args.get("pagina")) or 1, MAX_PAGE)
+    query = (select(Material).join(Favorite, Favorite.material_id == Material.id)
+             .where(Favorite.user_id == current_user.id, Material.is_hidden.is_(False))
+             .order_by(Favorite.created_at.desc(), Material.id.desc()))
+    pagination = db.paginate(query, page=page, per_page=PER_PAGE, error_out=False)
+
+    def page_url(number):
+        return url_for("materials.saved", pagina=number) if number > 1 else url_for("materials.saved")
+
+    return render_template("materials/saved.html", pagination=pagination, page=pagination.page,
+                           pages=pagination.pages, page_url=page_url,
+                           favorite_ids=_favorite_ids(pagination.items))
 
 
 @materials.route("/material/<int:material_id>/editar", methods=["GET", "POST"])
@@ -237,7 +357,7 @@ def explore():
         return url_for("materials.explore", **args)
 
     context = {"pagination": pagination, "page": pagination.page, "pages": pagination.pages,
-               "page_url": page_url}
+               "page_url": page_url, "favorite_ids": _favorite_ids(pagination.items)}
     if request.headers.get("HX-Request"):
         return render_template("partials/material_list.html", **context)
     subjects = Subject.query.order_by(Subject.name_key).all()

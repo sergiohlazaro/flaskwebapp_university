@@ -1,0 +1,11 @@
+{# Uso: include con `material` y `saved` (bool). Funciona con htmx y, sin JS, como formulario normal. #}
+<form class="favorite-form" method="post" action="{{ url_for('materials.toggle_favorite', material_id=material.id) }}"
+      hx-post="{{ url_for('materials.toggle_favorite', material_id=material.id) }}" hx-swap="outerHTML">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-sm {{ 'btn-warning' if saved else 'btn-outline-secondary' }} favorite-btn" type="submit"
+            aria-pressed="{{ 'true' if saved else 'false' }}"
+            aria-label="{{ 'Quitar de guardados' if saved else 'Guardar material' }}">
+        <i class="bi {{ 'bi-star-fill' if saved else 'bi-star' }}" aria-hidden="true"></i>
+        <span>{{ 'Quitar de guardados' if saved else 'Guardar' }}</span>
+    </button>
+</form>
