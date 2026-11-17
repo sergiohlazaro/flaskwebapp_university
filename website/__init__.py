@@ -61,6 +61,7 @@ def create_app(test_config=None):
         # SEC-07: un usuario bloqueado pierde la sesión en la siguiente petición.
         return None if user is None or user.is_blocked else user
 
+    from .blueprints.admin import admin
     from .blueprints.auth import auth
     from .blueprints.files import files
     from .blueprints.main import main
@@ -70,6 +71,7 @@ def create_app(test_config=None):
     app.register_blueprint(auth, url_prefix="/")
     app.register_blueprint(files)
     app.register_blueprint(main)
+    app.register_blueprint(admin)
 
     # No se crean usuarios por defecto. El primer administrador se crea con:
     #   flask --app main create-admin

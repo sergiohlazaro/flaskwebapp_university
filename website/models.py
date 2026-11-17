@@ -1,6 +1,7 @@
 """Modelos y enumeraciones de la aplicación (spec §7.2)."""
 
 import enum
+import unicodedata
 from datetime import UTC, datetime
 
 from flask_login import UserMixin
@@ -94,7 +95,9 @@ class Subject(db.Model):
 
     @validates("name")
     def _normalize_name(self, _key, value):
-        value = value.strip()
+        if not isinstance(value, str):
+            raise ValueError("El nombre de la asignatura es obligatorio.")  # noqa: TRY004
+        value = unicodedata.normalize("NFC", value).strip()
         self.name_key = value.casefold()
         return value
 

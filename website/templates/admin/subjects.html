@@ -1,0 +1,45 @@
+{% extends "admin/layout.html" %}
+{% block title %}Asignaturas · {{ app_name }}{% endblock %}
+{% block admin_content %}
+<div class="card mb-4"><div class="card-body">
+    <h2 class="h5">Nueva asignatura</h2>
+    <form method="post" action="{{ url_for('admin.subjects') }}" class="row g-2 align-items-start" novalidate>
+        {{ form.hidden_tag() }}
+        <div class="col-sm-8 col-md-6">
+            {{ form.name(class="form-control" ~ (" is-invalid" if form.name.errors else ""), maxlength=100, placeholder="Nombre de la asignatura", aria_label="Nombre de la asignatura") }}
+            {% for e in form.name.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-auto"><button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Crear</button></div>
+    </form>
+</div></div>
+
+<div class="card"><div class="card-body">
+    <h2 class="h5">Asignaturas</h2>
+    {% if subjects %}
+    <ul class="list-group list-group-flush">
+        {% for s in subjects %}
+        <li class="list-group-item">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-6">
+                    <form method="post" action="{{ url_for('admin.rename_subject', subject_id=s.id) }}" class="d-flex gap-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="text" name="name" value="{{ s.name }}" maxlength="100" class="form-control form-control-sm" aria-label="Nombre de {{ s.name }}" required>
+                        <button type="submit" class="btn btn-outline-primary btn-sm">Renombrar</button>
+                    </form>
+                </div>
+                <div class="col-md-6 d-flex gap-2 align-items-center justify-content-md-end">
+                    {% if s.is_archived %}<span class="badge text-bg-secondary">Archivada</span>{% endif %}
+                    <form method="post" action="{{ url_for('admin.toggle_archive_subject', subject_id=s.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">{{ "Restaurar" if s.is_archived else "Archivar" }}</button>
+                    </form>
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-secondary mb-0">Todavía no hay asignaturas.</p>
+    {% endif %}
+</div></div>
+{% endblock %}

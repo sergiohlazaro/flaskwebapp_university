@@ -1,5 +1,7 @@
 """Formularios WTForms (mensajes de validación en español)."""
 
+import unicodedata
+
 from flask_wtf import FlaskForm
 from wtforms import PasswordField, StringField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
@@ -48,3 +50,14 @@ class SignupForm(FlaskForm):
         from .models import User
         if User.query.filter_by(email=field.data).first():
             raise ValidationError("Ya existe una cuenta con ese email.")
+
+
+def _normalize_text(value):
+    return unicodedata.normalize("NFC", value).strip() if isinstance(value, str) else value
+
+
+class SubjectForm(FlaskForm):
+    name = StringField("Nombre de la asignatura", filters=[_normalize_text], validators=[
+        DataRequired("Escribe el nombre de la asignatura."),
+        Length(min=1, max=100, message="El nombre debe tener entre 1 y 100 caracteres."),
+    ])
