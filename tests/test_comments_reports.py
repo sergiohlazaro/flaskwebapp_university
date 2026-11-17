@@ -155,7 +155,9 @@ def test_cannot_report_own_content(app, client):
     resp = _report(client, "comment", mine.id)
     assert resp.status_code == 400 and "No puedes reportar tu propio contenido." in resp.get_data(as_text=True)
     login(client, "autor@uni.es")
-    assert _report(client, "material", material.id, headers=HX).status_code == 400
+    resp = _report(client, "material", material.id, headers=HX)
+    assert resp.status_code == 200 and "alert-danger" in resp.get_data(as_text=True)
+    assert "No puedes reportar tu propio contenido." in resp.get_data(as_text=True)
     assert Report.query.count() == 0
 
 
@@ -194,4 +196,31 @@ def test_report_unknown_or_hidden_target_404(app, client):
     assert _report(client, "material", hidden.id).status_code == 404
     assert _report(client, "comment", comment.id).status_code == 404
     assert client.get("/reportar?target_type=material&target_id=99999").status_code == 404
+    assert Report.query.count() == 0
+
+
+def test_no_js_report_redirects_to_material_detail(app, client):
+    author, _, material = _setup(client)
+    comment = _comment(material, author)
+    resp = client.post("/reportar", data={"target_type": "material", "target_id": material.id, "reason": "Otro"},
+                       headers={"Referer": f"http://localhost/reportar?target_type=material&target_id={material.id}"})
+    assert resp.status_code == 302 and resp.headers["Location"].endswith(f"/material/{material.id}#comments")
+    resp = client.post("/reportar", data={"target_type": "comment", "target_id": comment.id, "reason": "Otro"},
+                       headers={"Referer": "http://localhost/reportar?x=1"})
+    assert resp.headers["Location"].endswith(f"/material/{material.id}#comment-{comment.id}")
+    resp = client.post("/reportar", data={"target_type": "comment", "target_id": comment.id, "reason": "Otro"})
+    assert resp.headers["Location"].endswith(f"/material/{material.id}#comment-{comment.id}")
+
+
+def test_htmx_report_invalid_or_unavailable_returns_danger_alert(app, client):
+    _author, _, material = _setup(client)
+    resp = _report(client, "material", material.id, reason="Spam", headers=HX)
+    assert resp.status_code == 200 and "alert-danger" in resp.get_data(as_text=True)
+    material.is_hidden = True
+    db.session.commit()
+    resp = _report(client, "material", material.id, headers=HX)
+    html = resp.get_data(as_text=True)
+    assert resp.status_code == 200 and "alert-danger" in html and "ya no está disponible" in html
+    resp = _report(client, "comment", 99999, headers=HX)
+    assert resp.status_code == 200 and "ya no está disponible" in resp.get_data(as_text=True)
     assert Report.query.count() == 0

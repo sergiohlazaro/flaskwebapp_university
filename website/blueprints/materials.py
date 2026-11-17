@@ -6,6 +6,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user, login_required
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.exc import IntegrityError
+from werkzeug.exceptions import BadRequest, NotFound
 
 from ..extensions import db
 from ..forms import CommentForm, MaterialForm, ReportForm
@@ -275,7 +276,7 @@ INVALID_REPORT_MSG = "Revisa el motivo y los detalles del reporte."
 
 
 def _report_target(target_type, target_id):
-    """Devuelve (autor_id, material) del contenido reportable; 404 si no existe o no es visible."""
+    """Devuelve (tipo, id, autor_id, material_id) del contenido reportable; 404 si no existe o no es visible."""
     if target_type not in {t.value for t in ReportTarget}:
         abort(400)
     number = _int_param(target_id)
@@ -283,22 +284,26 @@ def _report_target(target_type, target_id):
         abort(404)
     if target_type == ReportTarget.MATERIAL.value:
         material = _visible_or_404(number)
-        return ReportTarget.MATERIAL, number, material.author_id
+        return ReportTarget.MATERIAL, number, material.author_id, material.id
     comment = db.session.get(Comment, number)
     if comment is None:
         abort(404)
     _visible_or_404(comment.material_id)
     if comment.is_hidden and not current_user.is_admin:
         abort(404)
-    return ReportTarget.COMMENT, number, comment.author_id
+    return ReportTarget.COMMENT, number, comment.author_id, comment.material_id
 
 
-def _report_reply(message, category, status, form=None, target=None):
+UNAVAILABLE_MSG = "Este contenido ya no está disponible."
+
+
+def _report_reply(message, category, status, form=None, target=None, anchor=None):
     if request.headers.get("HX-Request"):
-        return render_template("partials/report_result.html", message=message, category=category), status
+        # htmx no sustituye respuestas 4xx: el aviso viaja siempre en un 200.
+        return render_template("partials/report_result.html", message=message, category=category)
     if status == 200:
         flash(message, "success" if category == "success" else "info")
-        return redirect(_internal_referrer() or url_for("materials.explore"))
+        return redirect(url_for("materials.detail", material_id=anchor[0]) + anchor[1])
     form = form or ReportForm(formdata=None)
     return render_template("materials/report.html", form=form, message=message,
                            target_type=target[0] if target else "", target_id=target[1] if target else "",
@@ -309,8 +314,14 @@ def _report_reply(message, category, status, form=None, target=None):
 @login_required
 def report():
     source = request.form if request.method == "POST" else request.args
-    kind, target_id, author_id = _report_target(source.get("target_type"), source.get("target_id"))
+    try:
+        kind, target_id, author_id, material_id = _report_target(source.get("target_type"), source.get("target_id"))
+    except (NotFound, BadRequest):
+        if request.method == "POST" and request.headers.get("HX-Request"):
+            return _report_reply(UNAVAILABLE_MSG, "danger", 404)
+        raise
     target = (kind.value, target_id)
+    anchor = (material_id, "#comments" if kind is ReportTarget.MATERIAL else f"#comment-{target_id}")
     if request.method == "GET":
         return render_template("materials/report.html", form=ReportForm(formdata=None), message=None,
                                target_type=target[0], target_id=target[1],
@@ -323,11 +334,11 @@ def report():
     pending = Report.query.filter_by(reporter_id=current_user.id, target_type=kind, target_id=target_id,
                                      status=ReportStatus.PENDING).first()
     if pending is not None:
-        return _report_reply(REPORTED_MSG, "info", 200)
+        return _report_reply(REPORTED_MSG, "info", 200, anchor=anchor)
     db.session.add(Report(reporter_id=current_user.id, target_type=kind, target_id=target_id,
                           reason=ReportReason(form.reason.data), details=form.details.data or ""))
     db.session.commit()
-    return _report_reply(THANKS_MSG, "success", 200)
+    return _report_reply(THANKS_MSG, "success", 200, anchor=anchor)
 
 
 @materials.route("/guardados")

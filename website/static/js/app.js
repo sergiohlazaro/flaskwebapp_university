@@ -39,6 +39,32 @@
         });
     }
 
+    // Fallos de htmx (403/404/5xx): aviso genérico
+    document.body.addEventListener("htmx:responseError", function () {
+        var container = document.querySelector(".app-toasts");
+        if (!container) {
+            container = document.createElement("div");
+            container.className = "toast-container position-fixed top-0 end-0 p-3 app-toasts";
+            document.body.appendChild(container);
+        }
+        var toast = document.createElement("div");
+        toast.className = "toast align-items-center border-0 text-bg-danger";
+        toast.setAttribute("role", "alert");
+        toast.setAttribute("aria-live", "assertive");
+        toast.setAttribute("aria-atomic", "true");
+        var row = document.createElement("div");
+        row.className = "d-flex";
+        var text = document.createElement("div");
+        text.className = "toast-body";
+        text.textContent = "No se pudo completar la acción.";
+        row.appendChild(text);
+        toast.appendChild(row);
+        container.appendChild(toast);
+        if (window.bootstrap) {
+            window.bootstrap.Toast.getOrCreateInstance(toast, { delay: 5000 }).show();
+        }
+    });
+
     // Notificaciones de Bootstrap
     if (window.bootstrap) {
         document.querySelectorAll("[data-app-toast]").forEach(function (el) {
