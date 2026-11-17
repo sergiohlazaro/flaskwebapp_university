@@ -192,7 +192,7 @@ def profile():
                     image.thumbnail((300, 300))  # Redimensionar a máximo 300x300
                     image.save(filepath)
 
-                    current_user.profile_pic = filename
+                    current_user.avatar = filename
                 else:
                     flash('Invalid image file type.', category='error')
                     return render_template('profile.html', user=current_user)
@@ -482,7 +482,7 @@ def messages():
                 and_(Message.sender_id == current_user.id, Message.receiver_id == selected_user_id),
                 and_(Message.receiver_id == current_user.id, Message.sender_id == selected_user_id)
             )
-        ).order_by(Message.timestamp).all()
+        ).order_by(Message.created_at).all()
 
     return render_template(
         'messages.html',
@@ -538,7 +538,8 @@ def send_message():
         sender_id=current_user.id,
         receiver_id=receiver.id,
         content=content,
-        file_path=filename
+        file_stored_name=filename,
+        file_original_name=file.filename if filename else None
     )
     db.session.add(new_message)
     db.session.commit()

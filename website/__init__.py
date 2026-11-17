@@ -73,4 +73,8 @@ def create_app(test_config=None):
 
     app.cli.add_command(create_admin_command)
 
+    from .filters import register_filters
+
+    register_filters(app)
+
     return app

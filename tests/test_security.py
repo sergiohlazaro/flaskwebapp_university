@@ -24,8 +24,8 @@ def test_qa01_profile_pic_valid_png_is_accepted(app, client):
 
     assert response.status_code == 200
     assert b"Profile updated successfully." in response.data
-    stored = db.session.get(User, user.id).profile_pic
-    assert stored != "default.jpg"
+    stored = db.session.get(User, user.id).avatar
+    assert stored is not None
     path = os.path.join(app.root_path, "static", "profile_pics", stored)
     assert os.path.exists(path)
     os.remove(path)
@@ -48,8 +48,8 @@ def test_qa01_profile_pic_phone_jpeg_mpo_is_accepted(app, client):
     )
 
     assert b"Profile updated successfully." in response.data
-    stored = db.session.get(User, user.id).profile_pic
-    assert stored != "default.jpg"
+    stored = db.session.get(User, user.id).avatar
+    assert stored is not None
     os.remove(os.path.join(app.root_path, "static", "profile_pics", stored))
 
 
@@ -65,7 +65,7 @@ def test_qa01_profile_pic_fake_image_is_rejected(app, client):
     )
 
     assert b"Invalid image file type." in response.data
-    assert db.session.get(User, user.id).profile_pic == "default.jpg"
+    assert db.session.get(User, user.id).avatar is None
 
 
 # ---------------------------------------------------------------------------
@@ -247,8 +247,8 @@ def test_sec05_profile_pic_named_default_does_not_overwrite_shared_default(app, 
     finally:
         with open(default_path, "wb") as fh:  # restaurar si el test falla
             fh.write(original)
-        stored = db.session.get(User, user.id).profile_pic
-        if stored != "default.jpg" and os.path.exists(_static(app, "profile_pics", stored)):
+        stored = db.session.get(User, user.id).avatar
+        if stored is not None and os.path.exists(_static(app, "profile_pics", stored)):
             os.remove(_static(app, "profile_pics", stored))
 
 
@@ -311,7 +311,7 @@ def test_sec05_message_attachments_with_same_name_are_stored_separately(app, cli
         )
         _logout(client)
 
-    paths = [m.file_path for m in Message.query.order_by(Message.id).all()]
+    paths = [m.file_stored_name for m in Message.query.order_by(Message.id).all()]
     try:
         assert len(set(paths)) == 2
         with open(_static(app, "uploads", "messages", paths[0]), "rb") as fh:

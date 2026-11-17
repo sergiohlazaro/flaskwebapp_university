@@ -31,13 +31,14 @@ def client(app):
     return app.test_client()
 
 
-def make_user(email, role=1, name="Test", surname="User"):
+def make_user(email, role=1, name="Test", surname="User", is_teacher=False):
     user = User(
         name=name,
         surname=surname,
         email=email,
         password=generate_password_hash(PASSWORD),
         role=role,
+        is_teacher=is_teacher,
     )
     db.session.add(user)
     db.session.commit()

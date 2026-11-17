@@ -1,125 +1,205 @@
-# Importar módulo para trabajar con fechas y horas
-from datetime import datetime
-import pytz  # Biblioteca para manejo de zonas horarias
+"""Modelos y enumeraciones de la aplicación (spec §7.2)."""
 
-# Importar la instancia de SQLAlchemy de la aplicación
-from . import db
+import enum
+from datetime import UTC, datetime
 
-# UserMixin proporciona métodos útiles para usuarios autenticados (Flask-Login)
 from flask_login import UserMixin
+from sqlalchemy import CheckConstraint, Index, func
+from sqlalchemy.sql import func as sql_func
 
-# Función de SQLAlchemy para obtener el timestamp del momento en el que se crea un registro
-from sqlalchemy.sql import func
+from .extensions import db
 
-# -----------------------
-# MODELO DE USUARIOS
-# -----------------------
+
+def utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+def _enum(cls):
+    # Se guarda el valor (cadena en español), no el nombre del miembro.
+    return db.Enum(cls, values_callable=lambda e: [m.value for m in e],
+                   native_enum=False, validate_strings=True, length=20)
+
+
+class Course(enum.Enum):
+    FIRST = "1º"
+    SECOND = "2º"
+    THIRD = "3º"
+    FOURTH = "4º"
+    MASTER = "Máster"
+
+
+class MaterialKind(enum.Enum):
+    NOTES = "Apuntes"
+    EXERCISES = "Ejercicios"
+    EXAM = "Examen"
+    SUMMARY = "Resumen"
+    OTHER = "Otro"
+
+
+class ReportReason(enum.Enum):
+    INAPPROPRIATE = "Inapropiado"
+    WRONG = "Erróneo"
+    COPYRIGHT = "Copyright"
+    OTHER = "Otro"
+
+
+class ReportStatus(enum.Enum):
+    PENDING = "pending"
+    RESOLVED = "resolved"
+    DISMISSED = "dismissed"
+
+
+class ReportTarget(enum.Enum):
+    MATERIAL = "material"
+    COMMENT = "comment"
+
 
 class User(UserMixin, db.Model):
-    # Declaración de tabla → automáticamente será "user" en la base de datos
-
-    # ID único del usuario (clave primaria)
     id = db.Column(db.Integer, primary_key=True)
-
-    # Nombre del usuario
-    name = db.Column(db.String(100), unique=False, nullable=False)
-
-    # Apellido del usuario
-    surname = db.Column(db.String(100), unique=False, nullable=False)
-
-    # Email del usuario (debe ser único para evitar registros duplicados)
+    name = db.Column(db.String(100), nullable=False)
+    surname = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
-
-    # Contraseña hasheada del usuario (almacenada de manera segura)
-    password = db.Column(db.String(100), nullable=False)
-
-    # Biografía del usuario (texto largo opcional). Tiene un valor por defecto
+    password = db.Column(db.String(255), nullable=False)
     bio = db.Column(db.Text, default="This is my bio.")
-
-    # Rol del usuario: 0 = administrador, 1 = usuario normal
+    # 0 = administrador, 1 = usuario normal
     role = db.Column(db.Integer, nullable=False, default=1)
-
-    # Estado de bloqueo de la cuenta (True = bloqueado, False = activo)
+    is_teacher = db.Column(db.Boolean, nullable=False, default=False)
     is_blocked = db.Column(db.Boolean, nullable=False, default=False)
-
-    # Imagen de perfil (cadena con el nombre del archivo)
-    profile_pic = db.Column(db.String(150), default='default.jpg')
-
-    # Campo para URL del perfil de Twitter (opcional)
+    # None = usar el avatar por defecto
+    avatar = db.Column(db.String(150), nullable=True, default=None)
     twitter = db.Column(db.String(255), nullable=True)
-
-    # Campo para URL del perfil de LinkedIn (opcional)
     linkedin = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
 
-    # Relación uno a muchos con publicaciones → Un usuario puede tener muchas publicaciones
     publications = db.relationship('Publication')
-
-    # Relación uno a muchos con registros de inicio de sesión → Un usuario puede tener múltiples registros de login
     login_records = db.relationship('LoginRecord')
 
-# -----------------------
-# MODELO DE PUBLICACIONES
-# -----------------------
+    @property
+    def display_name(self) -> str:
+        return f"{self.name} {self.surname}".strip()
 
-class Publication(db.Model):
-    # ID único de la publicación
+    @property
+    def is_admin(self) -> bool:
+        return self.role == 0
+
+
+class Subject(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    is_archived = db.Column(db.Boolean, nullable=False, default=False)
 
-    # Contenido de la publicación (campo obligatorio)
+    __table_args__ = (
+        Index("uq_subject_name_lower", func.lower(name), unique=True),
+    )
+
+
+class Material(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text, nullable=False, default="")
+    subject_id = db.Column(db.Integer, db.ForeignKey("subject.id"), nullable=False)
+    course = db.Column(_enum(Course), nullable=True)
+    kind = db.Column(_enum(MaterialKind), nullable=True)
+    author_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+    is_hidden = db.Column(db.Boolean, nullable=False, default=False)
+
+    subject = db.relationship("Subject")
+    author = db.relationship("User")
+    files = db.relationship("MaterialFile", cascade="all, delete-orphan", backref="material")
+    ratings = db.relationship("Rating", cascade="all, delete-orphan", backref="material")
+    favorites = db.relationship("Favorite", cascade="all, delete-orphan", backref="material")
+    comments = db.relationship("Comment", cascade="all, delete-orphan", backref="material")
+
+    @property
+    def average_rating(self) -> float | None:
+        if not self.ratings:
+            return None
+        return sum(r.stars for r in self.ratings) / len(self.ratings)
+
+    @property
+    def rating_count(self) -> int:
+        return len(self.ratings)
+
+
+class MaterialFile(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    material_id = db.Column(db.Integer, db.ForeignKey("material.id", ondelete="CASCADE"), nullable=False)
+    stored_name = db.Column(db.String(255), nullable=False)
+    original_name = db.Column(db.String(255), nullable=False)
+    mime = db.Column(db.String(100), nullable=False)
+    size = db.Column(db.Integer, nullable=False)
+
+
+class Rating(db.Model):
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), primary_key=True)
+    material_id = db.Column(db.Integer, db.ForeignKey("material.id", ondelete="CASCADE"), primary_key=True)
+    stars = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+    __table_args__ = (CheckConstraint("stars BETWEEN 1 AND 5", name="ck_rating_stars"),)
+
+
+class Favorite(db.Model):
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), primary_key=True)
+    material_id = db.Column(db.Integer, db.ForeignKey("material.id", ondelete="CASCADE"), primary_key=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    material_id = db.Column(db.Integer, db.ForeignKey("material.id", ondelete="CASCADE"), nullable=False)
+    author_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    is_hidden = db.Column(db.Boolean, nullable=False, default=False)
+
+    author = db.relationship("User")
+
+
+class Report(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    reporter_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    target_type = db.Column(_enum(ReportTarget), nullable=False)
+    target_id = db.Column(db.Integer, nullable=False)
+    reason = db.Column(_enum(ReportReason), nullable=False)
+    details = db.Column(db.String(500), nullable=False, default="")
+    status = db.Column(_enum(ReportStatus), nullable=False, default=ReportStatus.PENDING)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    resolved_by_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
+    resolved_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    reporter = db.relationship("User", foreign_keys=[reporter_id])
+    resolved_by = db.relationship("User", foreign_keys=[resolved_by_id])
+
+
+# Se conserva hasta la Tarea 14 (la app antigua todavía lo usa).
+class Publication(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
-
-    # Fecha de publicación → Se almacena con timezone. Por defecto, la fecha actual
-    date = db.Column(db.DateTime(timezone=True), default=func.now())
-
-    # Relación con el usuario → Clave foránea
+    date = db.Column(db.DateTime(timezone=True), default=sql_func.now())
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-    # Ruta de archivo opcional (se puede adjuntar un archivo a la publicación)
     file_path = db.Column(db.String(255), nullable=True)
 
-# -----------------------
-# MODELO DE REGISTRO DE LOGIN
-# -----------------------
 
 class LoginRecord(db.Model):
-    # ID único del registro de login
     id = db.Column(db.Integer, primary_key=True)
-
-    # Relación con el usuario → Clave foránea
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-    # Dirección IP desde donde se hizo login → Muy útil para seguridad
     ip_address = db.Column(db.String(50), nullable=False)
+    # Se guarda en UTC; la hora de Madrid se obtiene al mostrarla (filtro localtime).
+    login_time = db.Column(db.DateTime(timezone=True), default=utcnow)
 
-    # Fecha y hora del login → Por defecto se establece a la hora local de Madrid (zona horaria definida con pytz)
-    # IMPORTANTE: se pasa una función (lambda) para que se evalúe en cada inserción;
-    # pasar datetime.now(...) directamente fijaba la hora de arranque del servidor.
-    login_time = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/Madrid')))
-
-# -----------------------
-# MODELO DE MENSAJES
-# -----------------------
 
 class Message(db.Model):
-    # ID único del mensaje
     id = db.Column(db.Integer, primary_key=True)
-
-    # ID del remitente del mensaje (clave foránea relacionada con el usuario)
-    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-    # ID del receptor del mensaje (clave foránea relacionada con el usuario)
-    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-    # Contenido del mensaje
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="SET NULL"), nullable=True)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="SET NULL"), nullable=True)
     content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    read_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    file_stored_name = db.Column(db.String(255), nullable=True)
+    file_original_name = db.Column(db.String(255), nullable=True)
 
-    # Timestamp de cuándo se envió el mensaje → Por defecto se establece al momento actual
-    timestamp = db.Column(db.DateTime, default=func.now())
-
-    # Ruta opcional a un archivo adjunto
-    file_path = db.Column(db.String(255), nullable=True)
-
-    # Relaciones para facilitar el acceso a datos relacionados
     sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
     receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
-

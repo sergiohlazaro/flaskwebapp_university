@@ -79,20 +79,20 @@
                             </strong>
                             <span>{{ message.content }}</span>
 
-                            {% if message.file_path %}
+                            {% if message.file_stored_name %}
                             <div class="mt-2">
-                                {% if message.file_path.endswith(('png','jpg','jpeg','gif')) %}
-                                    <img src="{{ url_for('static', filename='uploads/messages/' + message.file_path) }}"
+                                {% if message.file_stored_name.endswith(('png','jpg','jpeg','gif')) %}
+                                    <img src="{{ url_for('static', filename='uploads/messages/' + message.file_stored_name) }}"
                                          class="img-fluid rounded" style="max-height: 200px;">
                                 {% else %}
-                                    <a href="{{ url_for('static', filename='uploads/messages/' + message.file_path) }}" download>
+                                    <a href="{{ url_for('static', filename='uploads/messages/' + message.file_stored_name) }}" download>
                                         📎 Download attached file
                                     </a>
                                 {% endif %}
                             </div>
                             {% endif %}
                             
-                            <small class="text-muted d-block">{{ message.timestamp }}</small>
+                            <small class="text-muted d-block">{{ message.created_at }}</small>
                         </li>
                         {% endfor %}
                     </ul>
