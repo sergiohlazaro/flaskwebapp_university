@@ -97,43 +97,18 @@ def create_app(test_config=None):
     app.register_blueprint(auth, url_prefix='/')
 
     # ------------------------------
-    # CREACIÓN DE TABLAS Y USUARIOS POR DEFECTO
+    # CREACIÓN DE TABLAS Y COMANDOS DE ADMINISTRACIÓN
     # ------------------------------
+    # No se crean usuarios por defecto (credenciales conocidas = riesgo crítico).
+    # El primer administrador se crea con:  flask --app main create-admin
 
+    from .commands import create_admin_command
     from .models import User
 
     with app.app_context():
         db.create_all()
 
-        if not app.config.get("TESTING"):
-            admin_user = User.query.filter_by(role=0).first()
-
-            if not admin_user:
-                from werkzeug.security import generate_password_hash
-
-                # Crear usuario administrador
-                new_admin = User(
-                    name='admin',
-                    surname='admin',
-                    email='admin@admin.com',
-                    password=generate_password_hash('admin'),
-                    role=0,
-                    is_blocked=False
-                )
-                db.session.add(new_admin)
-
-                # Crear usuario normal
-                new_user1 = User(
-                    name='User',
-                    surname='One',
-                    email='user1@user.com',
-                    password=generate_password_hash('password1'),
-                    role=1,
-                    is_blocked=False
-                )
-                db.session.add(new_user1)
-
-                db.session.commit()
+    app.cli.add_command(create_admin_command)
 
     # ------------------------------
     # LOGIN MANAGER (gestión de sesiones)

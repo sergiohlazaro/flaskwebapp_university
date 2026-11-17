@@ -142,3 +142,40 @@ def test_sec02_secret_key_is_read_from_environment(monkeypatch):
     app = create_app(TEST_DB)
 
     assert app.config["SECRET_KEY"] == "from-env-0123456789abcdef0123456789"
+
+
+# ---------------------------------------------------------------------------
+# SEC-03: no se crean cuentas con credenciales por defecto
+# ---------------------------------------------------------------------------
+
+def test_sec03_app_start_does_not_seed_default_accounts(tmp_path):
+    from website import create_app
+    app = create_app({"SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'prod.db'}"})
+
+    with app.app_context():
+        assert User.query.count() == 0
+
+
+def test_sec03_create_admin_command_creates_admin_with_given_password(app):
+    from werkzeug.security import check_password_hash
+    runner = app.test_cli_runner()
+
+    result = runner.invoke(
+        args=["create-admin", "--email", "boss@uni.es", "--name", "Ada", "--surname", "Lovelace"],
+        input="S3cure-pass!\nS3cure-pass!\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    admin = User.query.filter_by(email="boss@uni.es").one()
+    assert admin.role == 0
+    assert check_password_hash(admin.password, "S3cure-pass!")
+
+
+def test_sec03_create_admin_command_rejects_short_password(app):
+    runner = app.test_cli_runner()
+
+    result = runner.invoke(args=["create-admin", "--email", "boss@uni.es"], input="short\nshort\n")
+
+    assert result.exit_code != 0
+    assert "at least 8 characters" in result.output
+    assert User.query.filter_by(email="boss@uni.es").first() is None

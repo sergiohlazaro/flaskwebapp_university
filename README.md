@@ -1,12 +1,3 @@
-# Flask Web App
--------------------------------
-## Default users for test:
-user: admin.admin@admin.com
-password: admin
--------------------------------
-user: user1@user.com
-password: password1
--------------------------------
 # My Cloud Website
 
 **My Cloud Website** es una plataforma web desarrollada como parte de un Trabajo de Fin de Grado en Ingeniería Informática en la Universidad Politécnica de Madrid. Esta aplicación permite a estudiantes y miembros de una comunidad universitaria registrarse, compartir publicaciones, enviar mensajes privados y gestionar su perfil en un entorno seguro, accesible y colaborativo.
@@ -46,7 +37,12 @@ password: password1
     ```bash
     export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
 
-5. **Inicia la aplicación:**
+5. **Crea el primer administrador** (la aplicación no crea usuarios por defecto; te pedirá la contraseña, mínimo 8 caracteres):
+
+    ```bash
+    flask --app main create-admin --email tu-email@ejemplo.com
+
+6. **Inicia la aplicación:**
 
     ```bash
     python main.py
