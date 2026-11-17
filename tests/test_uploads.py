@@ -130,3 +130,34 @@ def test_files_live_outside_static(app):
     path = upload_path("materials", "abc.pdf")
     assert path.startswith(app.config["UPLOAD_ROOT"])
     assert not path.startswith(os.path.join(app.root_path, "static"))
+
+
+def _bmp_bytes():
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (10, 10)).save(buf, format="BMP")
+    return buf.getvalue()
+
+
+def test_real_bmp_renamed_png_is_upload_error(app):
+    with pytest.raises(UploadError):
+        validate_upload(fs(_bmp_bytes(), "a.png"), ALLOWED_MATERIAL_EXTENSIONS)
+    with pytest.raises(UploadError):
+        save_avatar(fs(_bmp_bytes(), "a.png"))
+
+
+def test_real_webp_renamed_jpg_is_upload_error(app):
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (10, 10)).save(buf, format="WEBP")
+    with pytest.raises(UploadError):
+        validate_upload(fs(buf.getvalue(), "a.jpg"), ALLOWED_MATERIAL_EXTENSIONS)
+
+
+def test_decompression_bomb_is_upload_error(app, monkeypatch):
+    from PIL import Image
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 10)
+    with pytest.raises(UploadError, match="demasiado grande"):
+        validate_upload(fs(png_bytes(size=(10, 10)), "a.png"), ALLOWED_MATERIAL_EXTENSIONS)
+    with pytest.raises(UploadError, match="demasiado grande"):
+        save_avatar(fs(png_bytes(size=(10, 10)), "a.png"))

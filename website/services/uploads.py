@@ -56,6 +56,8 @@ def detect_image_type(stream):
             image.verify()
             detected = (image.format or "").lower() or None
             return "jpeg" if detected == "mpo" else detected
+    except Image.DecompressionBombError:
+        raise UploadError("La imagen es demasiado grande.") from None
     except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
         return None
     finally:
@@ -93,7 +95,9 @@ def validate_upload(file: FileStorage, allowed: frozenset[str]) -> str:
     try:
         if ext in ALLOWED_IMAGE_EXTENSIONS:
             detected = detect_image_type(stream)
-            if detected is None or _IMAGE_STORED_EXT[detected] != ("jpg" if ext == "jpeg" else ext):
+            if detected not in _IMAGE_STORED_EXT or _IMAGE_STORED_EXT[detected] != (
+                "jpg" if ext == "jpeg" else ext
+            ):
                 raise UploadError("El archivo no es una imagen válida.")
         elif ext == "pdf":
             if stream.read(5) != b"%PDF-":
@@ -147,7 +151,9 @@ def save_avatar(file: FileStorage) -> SavedFile:
     """Valida con Pillow (MPO→JPEG), redimensiona a 300x300 como máximo y guarda."""
     validate_upload(file, ALLOWED_IMAGE_EXTENSIONS)
     detected = detect_image_type(file.stream)  # validate_upload ya lo comprobó
-    fmt = {"png": "PNG", "jpeg": "JPEG", "gif": "GIF"}[detected]
+    fmt = {"png": "PNG", "jpeg": "JPEG", "gif": "GIF"}.get(detected)
+    if fmt is None:
+        raise UploadError("El archivo no es una imagen válida.")
     os.makedirs(_kind_dir("avatars"), exist_ok=True)
     stored_name = _new_stored_name(_IMAGE_STORED_EXT[detected])
     path = upload_path("avatars", stored_name)
@@ -157,7 +163,7 @@ def save_avatar(file: FileStorage) -> SavedFile:
             if fmt == "JPEG" and image.mode not in ("RGB", "L"):
                 image = image.convert("RGB")
             image.save(path, format=fmt)
-    except (OSError, SyntaxError, ValueError):
+    except (OSError, SyntaxError, ValueError, Image.DecompressionBombError):
         if os.path.exists(path):
             os.remove(path)
         raise UploadError("El archivo no es una imagen válida.") from None
