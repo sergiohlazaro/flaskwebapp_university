@@ -14,7 +14,41 @@
 | Severidad | **Crítica**: compromiso total o trivial de cuentas/datos · **Alta**: impacto grave, explotable o que impide funcionar · **Media**: impacto real con condiciones · **Baja**: higiene, defensa en profundidad o bug menor |
 | Confianza | **Alta**: verificado leyendo el código · **Media**: depende de versión, entorno o datos externos no verificados en ejecución |
 | Esfuerzo | **E1** rápido (< 1 h) · **E2** medio (1–4 h) · **E3** grande (> 4 h o requiere decisión de diseño) |
-| Estado | Todos los hallazgos están **pendientes** (Fase 1 no corrige nada). |
+| Estado | Ver la sección **0. Estado tras la Fase 2**: corregido · mitigado · pendiente · descartado. |
+
+---
+
+## 0. Estado tras la Fase 2
+
+- **Rama:** `fix/audit-phase2` (worktree), creada desde `c485c50`. **Sin merge.**
+- **Alcance:** hallazgos críticos y altos. SEC-08 se reclasificó de Media a Alta tras ejecutar `pip-audit` y entra en el alcance. SEC-04 queda fuera por requerir decisión de diseño.
+- **Método:** `systematic-debugging` (causa raíz reproducida antes de tocar código), `test-driven-development` (test en rojo → arreglo mínimo → verde), un commit por hallazgo con su ID, `verification-before-completion` y una revisión de código independiente (`requesting-code-review`), cuyas dos observaciones importantes se corrigieron con commits adicionales.
+- **Verificación final:** 32 tests en verde (14 originales + 18 de regresión en `test_security.py`); `ruff` 17 avisos, idénticos a la línea base (ninguno nuevo); `pip-audit` sin vulnerabilidades conocidas; instalación limpia de `requirements.txt` y `pip check` correctos; servidor real arrancado y respondiendo (`/`, `/login`, `/signup`, `/about` → 200; `/home` → 302 a login).
+- **Plugin `security-guidance`:** no está instalado en el entorno, así que no emitió avisos ni bloqueos.
+
+| ID | Severidad | Estado | Commit(s) | Notas |
+|---|---|---|---|---|
+| SEC-01 | Crítica | **Corregido** | `1823304` | Decorador `admin_required` (403) en `/block_user` y `/unblock_user`. |
+| SEC-02 | Crítica | **Corregido** | `8c520e5` | `SECRET_KEY` desde el entorno; clave aleatoria por proceso si falta. **Hay que considerar comprometida la clave antigua.** Residual pendiente: si se despliega con varios workers sin `SECRET_KEY`, cada uno usa una clave distinta y las sesiones fallan; el aviso del log y el README solo mencionan el reinicio. Conviene exigir la variable fuera de desarrollo. |
+| SEC-03 | Crítica | **Corregido** | `c3bce33`, `b04a94c` | Sin seed; comando `flask --app main create-admin`; login con las credenciales por defecto antiguas rechazado en BDs existentes. |
+| SEC-04 | Alta | Pendiente: requiere diseño | — | Decidir almacenamiento fuera de `static/` y ruta autenticada. SEC-05 lo mitiga en parte: los ficheros nuevos tienen nombres UUID imposibles de adivinar, pero quien conozca la URL puede descargarlos sin login. |
+| SEC-05 | Alta | **Corregido** | `10155d9` | Subidas guardadas como `<uuid4>.<ext>`. Los ficheros subidos antes conservan su nombre. |
+| SEC-08 | Alta (antes Media) | **Corregido** | `e7c562c` | 7 paquetes actualizados; `pip-audit` limpio. |
+| QA-01 | Alta | **Corregido** | `25513f2`, `aead6e0` | Detección con Pillow; los JPEG multi-imagen (MPO) de móviles se aceptan. |
+| QA-02 | Alta | **Corregido** | `aec6563` | `create_app(test_config)`; reproducido el borrado de la BD real antes del arreglo. |
+| QA-03 | Alta | **Corregido** | `cf6882d` | `default` como función. Los registros antiguos conservan la hora errónea. |
+| SEC-18 | Baja | Mitigado | `c3bce33` | Ya no se recrea `admin/admin`; sigue pendiente impedir borrar al último admin. |
+| QA-11 | Baja | Parcial | `e7c562c` | Eliminado `timedelta` (no instalable); pendiente separar dependencias de runtime y desarrollo. |
+| SEC-06, SEC-07, SEC-09, SEC-10, SEC-14, SEC-15, QA-04, QA-14 | Media | Pendiente | — | Fuera del alcance (críticos y altos). |
+| SEC-11, SEC-13, SEC-17, QA-12 | Media/Baja | Pendiente: requiere diseño | — | Ver sección 4. |
+| SEC-12, SEC-16, QA-05, QA-06, QA-07, QA-08, QA-09, QA-10, QA-13, QA-15, QA-16, QA-17 | Baja | Pendiente | — | Fuera del alcance. |
+
+**Descartados:** ninguno.
+
+**Nuevos puntos menores detectados en la revisión de código (pendientes):**
+- Una JPEG truncada o una "bomba de descompresión" pasa `verify()` y falla en `thumbnail()` con un 500. Ya ocurría antes; encaja con QA-04.
+- Varios tests escriben en las carpetas reales `website/static/...` porque las rutas son relativas al directorio de trabajo; los tests limpian lo que crean. Encaja con QA-14 y QA-17.
+- `create-admin` no valida el formato del email. Encaja con SEC-15.
 
 ---
 
@@ -54,7 +88,7 @@
 | QA-03 | Alta | Alta | E1 | `LoginRecord.login_time` siempre guarda la misma hora | |
 | SEC-06 | Media (latente Crítica) | Alta | E1 | Vistas cacheadas sin clave de usuario; `/admin` cachea tras el control de rol | |
 | SEC-07 | Media | Alta | E2 | Usuarios bloqueados conservan su sesión y casi toda la funcionalidad | |
-| SEC-08 | Media | Media | E1 | Dependencias con CVEs conocidos (Flask, Pillow, Werkzeug) | |
+| SEC-08 | Alta (antes Media) | Alta | E1 | Dependencias con CVEs conocidos: 98 en 7 paquetes según `pip-audit` | |
 | SEC-09 | Media | Alta | E1 | Enumeración de usuarios (login, registro, mensajes) | |
 | SEC-10 | Media | Alta | E2 | Protección anti fuerza bruta débil y no persistente | |
 | SEC-11 | Media | Alta | E1 | "Recordarme" forzado y cookies de sesión sin caducidad ni endurecimiento | Sí |
@@ -116,8 +150,9 @@
 - **Impacto:** en cuanto se configure una caché real (Simple, Redis…), un usuario normal que pida `/admin` en los 60 s posteriores a la visita de un admin recibirá la página completa del panel (todos los usuarios y sus IPs). `userlist`/`viewuser` servirían la página de otro usuario, con su nombre en la barra y su token CSRF. Además `viewuser` ignora `?page=` en la clave.
 - **Propuesta:** quitar `@cache.cached` de vistas que dependen del usuario o usar `make_cache_key` que incluya `current_user.id` y la query string; en cualquier caso, comprobar autorización fuera/antes de la caché. Si no se necesita caché, eliminar Flask-Caching.
 
-#### SEC-08: Dependencias con CVEs conocidos · Media · Confianza media
-- **Evidencia:** `requirements.txt`:
+#### SEC-08: Dependencias con CVEs conocidos · ~~Media~~ **Alta** (reclasificado en Fase 2) · Confianza alta
+- **Verificación Fase 2:** `pip-audit` encontró **98 vulnerabilidades conocidas en 7 paquetes**: bleach, Brotli, Flask, **Pillow (77, procesa imágenes subidas por usuarios)**, Pygments, pytest y Werkzeug. Además `requirements.txt` no se podía instalar porque `timedelta==2020.12.3` no existe en PyPI.
+- **Evidencia original (Fase 1, sin ejecutar herramientas):** `requirements.txt`:
   - `Flask==3.1.0` (línea 7): CVE-2025-47278, orden incorrecto de `SECRET_KEY_FALLBACKS` en la firma de sesiones; corregido en 3.1.1. Impacto bajo aquí (no se usan fallbacks).
   - `pillow==11.2.1` (línea 24): CVE-2025-48379, desbordamiento de búfer al **escribir** imágenes DDS; corregido en 11.3.0. Impacto bajo aquí (solo se guardan PNG/JPEG/GIF).
   - `Werkzeug==3.1.3` (línea 34): CVE-2025-66221, `safe_join` permite nombres de dispositivo de Windows; corregido en 3.1.4. Solo relevante si se despliega en Windows.
@@ -190,6 +225,7 @@
 - **Propuesta:** extraer `save_upload(file, subfolder, allowed)` a un módulo `uploads.py`.
 
 #### QA-11: Dependencias mezcladas · Baja · Confianza alta
+- **Nota Fase 2:** al instalar se comprobó que `timedelta==2020.12.3` no existe en PyPI, así que `pip install -r requirements.txt` fallaba; se eliminó en el commit de SEC-08.
 - **Evidencia:** `requirements.txt` incluye `pytest`, `pluggy`, `iniconfig`, `rich`, `Pygments`, `markdown-it-py` (desarrollo) junto al runtime; `timedelta==2020.12.3` (paquete de terceros no usado).
 - **Impacto:** mayor superficie de ataque en producción y dependencias huérfanas.
 - **Propuesta:** separar `requirements.txt` y `requirements-dev.txt` (o `pyproject.toml`), eliminar `timedelta`.
