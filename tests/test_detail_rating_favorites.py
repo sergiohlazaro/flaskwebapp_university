@@ -174,3 +174,12 @@ def test_feed_card_shows_saved_state(app, client):
     client.post(f"/material/{material.id}/guardar")
     body = client.get("/explorar").get_data(as_text=True)
     assert "Quitar de guardados" in body
+
+
+def test_edited_marker_only_after_edit(app, client):
+    _, _, material = _setup(client)
+    assert material.updated_at == material.created_at
+    assert "(editado)" not in client.get(f"/material/{material.id}").get_data(as_text=True)
+    material.title = "Cambiado"
+    db.session.commit()
+    assert "(editado)" in client.get(f"/material/{material.id}").get_data(as_text=True)

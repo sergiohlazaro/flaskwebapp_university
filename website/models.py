@@ -111,7 +111,9 @@ class Material(db.Model):
     kind = db.Column(_enum(MaterialKind), nullable=True)
     author_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
-    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+    # Al crear, updated_at copia created_at (mismo valor); solo cambia al editar.
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False,
+                           default=lambda ctx: ctx.get_current_parameters()["created_at"], onupdate=utcnow)
     is_hidden = db.Column(db.Boolean, nullable=False, default=False)
 
     subject = db.relationship("Subject")
