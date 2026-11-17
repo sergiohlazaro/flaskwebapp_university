@@ -1,0 +1,31 @@
+{# Uso: include con `comment`, `material`. Cuerpo escapado; saltos de línea por CSS (pre-line). #}
+{% from "partials/user_badge.html" import user_badge %}
+{% set hidden_for_me = comment.is_hidden and not current_user.is_admin %}
+<li class="comment list-group-item{% if comment.is_hidden %} comment-hidden{% endif %}" id="comment-{{ comment.id }}">
+    {% if hidden_for_me %}
+    <p class="text-secondary fst-italic mb-0"><i class="bi bi-eye-slash" aria-hidden="true"></i> Comentario ocultado por moderación.</p>
+    {% else %}
+    <div class="d-flex align-items-center gap-2 small text-secondary mb-1 flex-wrap">
+        <img class="avatar-sm" src="{{ url_for('files.avatar', user_id=comment.author.id) }}" alt="">
+        {{ user_badge(comment.author) }}
+        <span>· {{ comment.created_at|timeago }}</span>
+        {% if comment.is_hidden %}<span class="badge text-bg-secondary">Oculto</span>{% endif %}
+    </div>
+    <p class="comment-body mb-1">{{ comment.body }}</p>
+    <div class="d-flex gap-2">
+        {% if comment.author_id == current_user.id or current_user.is_admin %}
+        <form method="post" action="{{ url_for('materials.delete_comment', comment_id=comment.id) }}"
+              hx-post="{{ url_for('materials.delete_comment', comment_id=comment.id) }}"
+              hx-target="#comment-list" hx-swap="outerHTML">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-link text-danger p-0" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Borrar</button>
+        </form>
+        {% endif %}
+        {% if comment.author_id != current_user.id %}
+        <a class="btn btn-sm btn-link text-secondary p-0" data-bs-toggle="modal" data-bs-target="#report-modal"
+           data-target-type="comment" data-target-id="{{ comment.id }}"
+           href="{{ url_for('materials.report', target_type='comment', target_id=comment.id) }}"><i class="bi bi-flag" aria-hidden="true"></i> Reportar</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</li>

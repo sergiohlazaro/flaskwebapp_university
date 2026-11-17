@@ -130,3 +130,7 @@ body {
 .file-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: var(--app-radius, 8px); }
 .star-btn { font-size: 1.25rem; line-height: 1; }
 .card-actions { position: relative; z-index: 2; }
+
+/* Comentarios y reportes */
+.comment-body { white-space: pre-line; overflow-wrap: anywhere; }
+.comment-hidden .comment-body { opacity: 0.6; }

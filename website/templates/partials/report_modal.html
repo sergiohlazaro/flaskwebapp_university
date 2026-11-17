@@ -1,0 +1,20 @@
+{# Modal único de reporte; app.js rellena el destino al abrirlo. Uso: include con `report_form`. #}
+<div class="modal fade" id="report-modal" tabindex="-1" aria-labelledby="report-modal-title" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="report-modal-title">Reportar contenido</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body" id="report-modal-body">
+                <form method="post" action="{{ url_for('materials.report') }}"
+                      hx-post="{{ url_for('materials.report') }}" hx-target="#report-modal-body" hx-swap="innerHTML">
+                    {% with form=report_form, target_type='', target_id='', field_suffix='modal' %}
+                    {% include "partials/report_fields.html" %}
+                    {% endwith %}
+                    <button class="btn btn-danger" type="submit">Enviar reporte</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

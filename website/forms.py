@@ -101,3 +101,21 @@ class MaterialForm(FlaskForm):
     def validate_subject_id(self, field):
         if not field.data:
             raise ValidationError("Selecciona una asignatura.")
+
+
+class CommentForm(FlaskForm):
+    body = TextAreaField("Comentario", filters=[_strip], validators=[
+        DataRequired("Escribe un comentario."),
+        Length(max=2000, message="El comentario no puede superar los 2000 caracteres."),
+    ])
+
+
+class ReportForm(FlaskForm):
+    target_type = StringField("Tipo")
+    target_id = StringField("Identificador")
+    reason = _ChoiceField("Motivo", coerce=str, choices=[
+        (value, value) for value in ("Inapropiado", "Erróneo", "Copyright", "Otro")])
+    details = TextAreaField("Detalles (opcional)", filters=[_strip], validators=[
+        Optional(),
+        Length(max=500, message="Los detalles no pueden superar los 500 caracteres."),
+    ])

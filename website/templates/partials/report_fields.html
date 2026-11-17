@@ -1,0 +1,18 @@
+{# Campos del formulario de reporte. Con `target_type` y `target_id` fijados en el servidor (página sin JS). #}
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<input type="hidden" name="target_type" value="{{ target_type or '' }}" data-report-type>
+<input type="hidden" name="target_id" value="{{ target_id or '' }}" data-report-id>
+<div class="mb-3">
+    <label class="form-label" for="report-reason-{{ field_suffix }}">Motivo</label>
+    <select class="form-select" id="report-reason-{{ field_suffix }}" name="reason" required>
+        {% for value, label in form.reason.choices %}
+        <option value="{{ value }}"{% if form.reason.data == value %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    {% for error in form.reason.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+</div>
+<div class="mb-3">
+    <label class="form-label" for="report-details-{{ field_suffix }}">Detalles (opcional)</label>
+    <textarea class="form-control" id="report-details-{{ field_suffix }}" name="details" rows="3" maxlength="500">{{ form.details.data or '' }}</textarea>
+    {% for error in form.details.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+</div>

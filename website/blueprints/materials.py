@@ -8,14 +8,19 @@ from sqlalchemy import Select, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from ..extensions import db
-from ..forms import MaterialForm
+from ..forms import CommentForm, MaterialForm, ReportForm
 from ..models import (
+    Comment,
     Course,
     Favorite,
     Material,
     MaterialFile,
     MaterialKind,
     Rating,
+    Report,
+    ReportReason,
+    ReportStatus,
+    ReportTarget,
     Subject,
     User,
 )
@@ -161,12 +166,26 @@ def _back(material):
     return redirect(_internal_referrer() or url_for("materials.detail", material_id=material.id))
 
 
+def _comment_context(material, form=None):
+    comments = db.session.scalars(select(Comment).where(Comment.material_id == material.id)
+                                  .order_by(Comment.created_at, Comment.id)).all()
+    return {"comments": comments, "comment_form": form or CommentForm(formdata=None),
+            "report_form": ReportForm(formdata=None)}
+
+
+def _comments_response(material, form=None):
+    """Lista de comentarios para htmx; sin htmx, vuelve al detalle."""
+    if request.headers.get("HX-Request"):
+        return render_template("partials/comment_list.html", material=material, **_comment_context(material, form))
+    return redirect(url_for("materials.detail", material_id=material.id) + "#comments")
+
+
 @materials.route("/material/<int:material_id>")
 @login_required
 def detail(material_id):
     material = _visible_or_404(material_id)
     return render_template("materials/detail.html", saved=_is_saved(material),
-                           **_rating_context(material))
+                           **_comment_context(material), **_rating_context(material))
 
 
 @materials.route("/material/<int:material_id>/valorar", methods=["POST"])
@@ -216,6 +235,99 @@ def toggle_favorite(material_id):
     if request.headers.get("HX-Request"):
         return render_template("partials/favorite_button.html", material=material, saved=_is_saved(material))
     return _back(material)
+
+
+@materials.route("/material/<int:material_id>/comentarios", methods=["POST"])
+@login_required
+def add_comment(material_id):
+    material = _get_or_404(material_id)
+    if material.is_hidden and not current_user.is_admin:
+        abort(404)
+    form = CommentForm()
+    if form.validate_on_submit():
+        db.session.add(Comment(material_id=material.id, author_id=current_user.id, body=form.body.data))
+        db.session.commit()
+        return _comments_response(material)
+    if request.headers.get("HX-Request"):
+        return _comments_response(material, form)
+    flash(" ".join(form.body.errors) or "No se pudo publicar el comentario.", "error")
+    return _comments_response(material)
+
+
+@materials.route("/comentarios/<int:comment_id>/borrar", methods=["POST"])
+@login_required
+def delete_comment(comment_id):
+    comment = db.session.get(Comment, comment_id)
+    if comment is None:
+        abort(404)
+    if comment.author_id != current_user.id and not current_user.is_admin:
+        abort(403)
+    material = _visible_or_404(comment.material_id)
+    db.session.delete(comment)
+    db.session.commit()
+    return _comments_response(material)
+
+
+OWN_CONTENT_MSG = "No puedes reportar tu propio contenido."
+REPORTED_MSG = "Ya lo has reportado."
+THANKS_MSG = "Gracias, un administrador lo revisará."
+INVALID_REPORT_MSG = "Revisa el motivo y los detalles del reporte."
+
+
+def _report_target(target_type, target_id):
+    """Devuelve (autor_id, material) del contenido reportable; 404 si no existe o no es visible."""
+    if target_type not in {t.value for t in ReportTarget}:
+        abort(400)
+    number = _int_param(target_id)
+    if number is None:
+        abort(404)
+    if target_type == ReportTarget.MATERIAL.value:
+        material = _visible_or_404(number)
+        return ReportTarget.MATERIAL, number, material.author_id
+    comment = db.session.get(Comment, number)
+    if comment is None:
+        abort(404)
+    _visible_or_404(comment.material_id)
+    if comment.is_hidden and not current_user.is_admin:
+        abort(404)
+    return ReportTarget.COMMENT, number, comment.author_id
+
+
+def _report_reply(message, category, status, form=None, target=None):
+    if request.headers.get("HX-Request"):
+        return render_template("partials/report_result.html", message=message, category=category), status
+    if status == 200:
+        flash(message, "success" if category == "success" else "info")
+        return redirect(_internal_referrer() or url_for("materials.explore"))
+    form = form or ReportForm(formdata=None)
+    return render_template("materials/report.html", form=form, message=message,
+                           target_type=target[0] if target else "", target_id=target[1] if target else "",
+                           back_url=_internal_referrer() or url_for("materials.explore")), status
+
+
+@materials.route("/reportar", methods=["GET", "POST"])
+@login_required
+def report():
+    source = request.form if request.method == "POST" else request.args
+    kind, target_id, author_id = _report_target(source.get("target_type"), source.get("target_id"))
+    target = (kind.value, target_id)
+    if request.method == "GET":
+        return render_template("materials/report.html", form=ReportForm(formdata=None), message=None,
+                               target_type=target[0], target_id=target[1],
+                               back_url=_internal_referrer() or url_for("materials.explore"))
+    form = ReportForm()
+    if author_id == current_user.id:
+        return _report_reply(OWN_CONTENT_MSG, "danger", 400, form, target)
+    if not form.validate_on_submit():
+        return _report_reply(INVALID_REPORT_MSG, "danger", 400, form, target)
+    pending = Report.query.filter_by(reporter_id=current_user.id, target_type=kind, target_id=target_id,
+                                     status=ReportStatus.PENDING).first()
+    if pending is not None:
+        return _report_reply(REPORTED_MSG, "info", 200)
+    db.session.add(Report(reporter_id=current_user.id, target_type=kind, target_id=target_id,
+                          reason=ReportReason(form.reason.data), details=form.details.data or ""))
+    db.session.commit()
+    return _report_reply(THANKS_MSG, "success", 200)
 
 
 @materials.route("/guardados")

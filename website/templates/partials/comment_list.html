@@ -1,0 +1,22 @@
+{# Uso: include con `material`, `comments` y `comment_form`. Es también la respuesta de htmx. #}
+<div id="comment-list">
+    {% if comments %}
+    <ul class="list-group mb-3">
+        {% for comment in comments %}{% include "partials/comment.html" %}{% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-secondary">Todavía no hay comentarios.</p>
+    {% endif %}
+    {% if not material.is_hidden %}
+    <form method="post" action="{{ url_for('materials.add_comment', material_id=material.id) }}"
+          hx-post="{{ url_for('materials.add_comment', material_id=material.id) }}"
+          hx-target="#comment-list" hx-swap="outerHTML">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="form-label" for="comment-body">Añadir un comentario</label>
+        <textarea class="form-control{% if comment_form.body.errors %} is-invalid{% endif %}" id="comment-body"
+                  name="body" rows="3" maxlength="2000" required>{{ comment_form.body.data or '' }}</textarea>
+        {% for error in comment_form.body.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        <button class="btn btn-primary mt-2" type="submit">Comentar</button>
+    </form>
+    {% endif %}
+</div>

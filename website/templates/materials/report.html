@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Reportar contenido · {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Reportar contenido</h1>
+{% if message %}<div class="alert alert-danger" role="alert">{{ message }}</div>{% endif %}
+<form method="post" action="{{ url_for('materials.report') }}" class="report-page-form">
+    {% with field_suffix='page' %}{% include "partials/report_fields.html" %}{% endwith %}
+    <button class="btn btn-danger" type="submit">Enviar reporte</button>
+    <a class="btn btn-link" href="{{ back_url }}">Cancelar</a>
+</form>
+{% endblock %}
