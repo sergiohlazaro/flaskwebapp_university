@@ -121,3 +121,6 @@ body {
 .cookie-banner[hidden] { display: none; }
 
 .htmx-request { opacity: 0.6; }
+
+/* Feed Explorar */
+.explore-filters .form-label { margin-bottom: 0.15rem; color: #6b7280; }

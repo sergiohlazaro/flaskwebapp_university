@@ -1,10 +1,13 @@
 """Crear, editar y borrar material didáctico (spec §5.1, §5.2)."""
+from collections.abc import Mapping
+
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import Select, func, or_, select
 
 from ..extensions import db
 from ..forms import MaterialForm
-from ..models import Course, Material, MaterialFile, MaterialKind, Subject
+from ..models import Course, Material, MaterialFile, MaterialKind, Rating, Subject, User
 from ..services.permissions import can_view_material
 from ..services.uploads import (
     ALLOWED_MATERIAL_EXTENSIONS,
@@ -14,9 +17,11 @@ from ..services.uploads import (
     validate_upload,
 )
 
-materials = Blueprint("materials", __name__, url_prefix="/material")
+materials = Blueprint("materials", __name__)
 
 MAX_FILES = 5
+PER_PAGE = 12
+MAX_PAGE = 1_000_000
 NO_FILES_MSG = "Sube al menos un fichero."
 TOO_MANY_MSG = "Máximo 5 ficheros."
 
@@ -87,7 +92,7 @@ def _cleanup(saved):
         delete_upload("materials", item.stored_name)
 
 
-@materials.route("/nuevo", methods=["GET", "POST"])
+@materials.route("/material/nuevo", methods=["GET", "POST"])
 @login_required
 def new():
     form = MaterialForm()
@@ -100,7 +105,7 @@ def new():
     return _render(form)
 
 
-@materials.route("/<int:material_id>")
+@materials.route("/material/<int:material_id>")
 @login_required
 def detail(material_id):
     material = _get_or_404(material_id)
@@ -109,7 +114,7 @@ def detail(material_id):
     return render_template("materials/detail.html", material=material)
 
 
-@materials.route("/<int:material_id>/editar", methods=["GET", "POST"])
+@materials.route("/material/<int:material_id>/editar", methods=["GET", "POST"])
 @login_required
 def edit(material_id):
     material = _get_or_404(material_id)
@@ -127,7 +132,7 @@ def edit(material_id):
     return _render(form, material)
 
 
-@materials.route("/<int:material_id>/borrar", methods=["POST"])
+@materials.route("/material/<int:material_id>/borrar", methods=["POST"])
 @login_required
 def delete(material_id):
     material = _get_or_404(material_id)
@@ -139,11 +144,10 @@ def delete(material_id):
     for name in stored:
         delete_upload("materials", name)
     flash("Material eliminado.", "success")
-    # La Tarea 8 añade /explorar; hasta entonces se vuelve a la portada.
-    return redirect(url_for("main.landing"))
+    return redirect(url_for("materials.explore"))
 
 
-@materials.route("/<int:material_id>/ficheros/<int:file_id>/quitar", methods=["POST"])
+@materials.route("/material/<int:material_id>/ficheros/<int:file_id>/quitar", methods=["POST"])
 @login_required
 def remove_file(material_id, file_id):
     material = _get_or_404(material_id)
@@ -161,3 +165,80 @@ def remove_file(material_id, file_id):
     delete_upload("materials", stored)
     flash("Fichero eliminado.", "success")
     return redirect(url_for("materials.edit", material_id=material.id))
+
+
+def _int_param(value, minimum=1):
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number >= minimum else None
+
+
+def _escape_like(text):
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def build_feed_query(params: Mapping[str, str], viewer: User) -> Select:
+    """Consulta del feed (sin paginar). Los valores inválidos se ignoran.
+
+    El material oculto no aparece en el feed para nadie, ni para su autor.
+    """
+    _ = viewer  # reservado: los perfiles reutilizan esta función con reglas por espectador
+    query = select(Material).where(Material.is_hidden.is_(False))
+
+    text = (params.get("q") or "").strip()
+    if text:
+        pattern = f"%{_escape_like(text)}%"
+        query = query.where(or_(Material.title.ilike(pattern, escape="\\"),
+                                Material.description.ilike(pattern, escape="\\")))
+
+    subject_id = _int_param(params.get("asignatura"))
+    if subject_id is not None and db.session.get(Subject, subject_id) is not None:
+        query = query.where(Material.subject_id == subject_id)
+
+    course = next((c for c in Course if c.value == params.get("curso")), None)
+    if course is not None:
+        query = query.where(Material.course == course)
+
+    kind = next((k for k in MaterialKind if k.value == params.get("tipo")), None)
+    if kind is not None:
+        query = query.where(Material.kind == kind)
+
+    if params.get("profesores") == "1":
+        query = query.where(Material.author_id.in_(select(User.id).where(User.is_teacher.is_(True))))
+
+    if params.get("orden") == "valorados":
+        stats = (select(Rating.material_id.label("material_id"),
+                        func.avg(Rating.stars).label("average"),
+                        func.count(Rating.stars).label("votes"))
+                 .group_by(Rating.material_id).subquery())
+        query = (query.outerjoin(stats, stats.c.material_id == Material.id)
+                 .order_by(stats.c.average.desc().nulls_last(), stats.c.votes.desc().nulls_last(),
+                           Material.created_at.desc(), Material.id.desc()))
+    else:
+        query = query.order_by(Material.created_at.desc(), Material.id.desc())
+    return query
+
+
+@materials.route("/explorar")
+@login_required
+def explore():
+    params = request.args
+    page = min(_int_param(params.get("pagina")) or 1, MAX_PAGE)
+    pagination = db.paginate(build_feed_query(params, current_user), page=page,
+                             per_page=PER_PAGE, error_out=False)
+
+    def page_url(number):
+        args = {k: v for k, v in params.items() if k != "pagina" and v != ""}
+        if number > 1:
+            args["pagina"] = number
+        return url_for("materials.explore", **args)
+
+    context = {"pagination": pagination, "page": pagination.page, "pages": pagination.pages,
+               "page_url": page_url}
+    if request.headers.get("HX-Request"):
+        return render_template("partials/material_list.html", **context)
+    subjects = Subject.query.order_by(Subject.name_key).all()
+    return render_template("materials/explore.html", subjects=subjects, courses=list(Course),
+                           kinds=list(MaterialKind), filters=params, **context)

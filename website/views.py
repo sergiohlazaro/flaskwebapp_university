@@ -62,7 +62,8 @@ def unique_filename(original_name):
 @views.route('/home')
 @login_required
 def home():
-    return render_template("legacy/home.html", user=current_user)
+    """URL antigua: el feed vive ahora en /explorar."""
+    return redirect(url_for("materials.explore"))
 
 # ---------------------------------
 # PERFIL DE USUARIO (EDITAR PERFIL)
@@ -210,7 +211,7 @@ def admin():
     # Verificar que el usuario tiene rol de administrador
     if current_user.role != 0:
         flash('You are not allowed to access this page', category='error')
-        return redirect(url_for('views.home'))
+        return redirect(url_for('materials.explore'))
 
     # Obtener todos los usuarios excepto el admin que está logueado
     users = User.query.filter(User.id != current_user.id).all()
@@ -274,7 +275,7 @@ def publications():
     # Verificar si el usuario está bloqueado
     if current_user.is_blocked:
         flash("Your account is blocked", category="error")
-        return redirect(url_for("views.home"))
+        return redirect(url_for("materials.explore"))
 
     if request.method == 'POST':
         publication_raw = request.form.get('publication')

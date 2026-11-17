@@ -9,8 +9,7 @@ main = Blueprint("main", __name__)
 @main.route("/")
 def landing():
     if current_user.is_authenticated:
-        # La Tarea 8 lo cambia a materials.explore.
-        return redirect(url_for("views.home"))
+        return redirect(url_for("materials.explore"))
     return render_template("main/landing.html")
 
 

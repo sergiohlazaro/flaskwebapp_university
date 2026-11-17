@@ -39,8 +39,8 @@ def _register_failure(ip_address):
 
 
 def _safe_next(target):
-    """Solo se siguen rutas relativas internas; cualquier otra cosa va a /home."""
-    default = url_for('views.home')
+    """Solo se siguen rutas relativas internas; cualquier otra cosa va a /explorar."""
+    default = url_for('materials.explore')
     if not target or not target.startswith('/') or target.startswith('//') or '\\' in target:
         return default
     parts = urlsplit(target)
@@ -116,7 +116,7 @@ def signup():
         db.session.commit()
 
         flash('Cuenta creada correctamente. ¡Bienvenido!', category='success')
-        return redirect(url_for('views.home'))
+        return redirect(url_for('materials.explore'))
 
     return render_template("auth/signup.html", form=form)
 

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Explorar · {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Explorar material</h1>
+
+<form class="card card-body mb-4 explore-filters" method="get" action="{{ url_for('materials.explore') }}"
+      hx-get="{{ url_for('materials.explore') }}" hx-target="#material-list" hx-push-url="true"
+      hx-trigger="change, input changed delay:300ms from:#f-q, submit">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-lg-3">
+            <label class="form-label small" for="f-q">Buscar</label>
+            <input class="form-control" id="f-q" type="search" name="q" value="{{ filters.get('q', '') }}"
+                   placeholder="Título o descripción" maxlength="100">
+        </div>
+        <div class="col-6 col-lg-2">
+            <label class="form-label small" for="f-asignatura">Asignatura</label>
+            <select class="form-select" id="f-asignatura" name="asignatura">
+                <option value="">Todas</option>
+                {% for subject in subjects %}
+                <option value="{{ subject.id }}" {{ 'selected' if filters.get('asignatura') == subject.id|string }}>{{ subject.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-lg-2">
+            <label class="form-label small" for="f-curso">Curso</label>
+            <select class="form-select" id="f-curso" name="curso">
+                <option value="">Todos</option>
+                {% for course in courses %}
+                <option value="{{ course.value }}" {{ 'selected' if filters.get('curso') == course.value }}>{{ course.value }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-lg-2">
+            <label class="form-label small" for="f-tipo">Tipo</label>
+            <select class="form-select" id="f-tipo" name="tipo">
+                <option value="">Todos</option>
+                {% for kind in kinds %}
+                <option value="{{ kind.value }}" {{ 'selected' if filters.get('tipo') == kind.value }}>{{ kind.value }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-lg-2">
+            <label class="form-label small" for="f-orden">Ordenar por</label>
+            <select class="form-select" id="f-orden" name="orden">
+                <option value="recientes" {{ 'selected' if filters.get('orden') != 'valorados' }}>Más recientes</option>
+                <option value="valorados" {{ 'selected' if filters.get('orden') == 'valorados' }}>Mejor valorados</option>
+            </select>
+        </div>
+        <div class="col-12 col-lg-1">
+            <button class="btn btn-primary w-100" type="submit">Filtrar</button>
+        </div>
+    </div>
+    <div class="form-check mt-2">
+        <input class="form-check-input" type="checkbox" id="f-profesores" name="profesores" value="1" {{ 'checked' if filters.get('profesores') == '1' }}>
+        <label class="form-check-label small" for="f-profesores">Solo material de profesores</label>
+    </div>
+</form>
+
+<section id="material-list" aria-live="polite">
+    {% include "partials/material_list.html" %}
+</section>
+{% endblock %}

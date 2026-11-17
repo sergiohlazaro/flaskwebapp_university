@@ -42,13 +42,13 @@ def test_blocked_user_gets_generic_message_and_counts_attempt(app, client):
 
     assert GENERIC in response.get_data(as_text=True)
     assert auth_module.FAILED_LOGINS["127.0.0.1"][0] == 1
-    assert client.get("/home").status_code == 302  # sin sesión
+    assert client.get("/explorar").status_code == 302  # sin sesión
 
 
 def test_blocked_user_session_is_invalidated(app, client):
     user = make_user("victim@uni.es")
     login(client, "victim@uni.es")
-    assert client.get("/home").status_code == 200
+    assert client.get("/explorar").status_code == 200
 
     user.is_blocked = True
     db.session.commit()
@@ -56,7 +56,7 @@ def test_blocked_user_session_is_invalidated(app, client):
     # en producción cada petición tiene su propio contexto.
     g.pop("_login_user", None)
 
-    response = client.get("/home")
+    response = client.get("/explorar")
     assert response.status_code == 302
     assert "/login" in response.headers["Location"]
 
@@ -94,7 +94,7 @@ def test_signup_missing_fields_no_500(client):
 def test_signup_redirects_after_success(client):
     response = _signup(client)
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/home")
+    assert response.headers["Location"].endswith("/explorar")
 
 
 def test_old_signup_url_redirects_308(client):
@@ -116,7 +116,7 @@ def test_login_next_param_rejects_external(app, client, target):
     response = client.post("/login", query_string={"next": target},
                            data={"email": "n@uni.es", "password": PASSWORD})
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/home")
+    assert response.headers["Location"].endswith("/explorar")
 
 
 def test_signup_cannot_set_teacher_or_admin(client):
@@ -131,7 +131,7 @@ def test_logout_requires_post(client):
     login(client, "o@uni.es")
     assert client.get("/logout").status_code == 405
     assert client.post("/logout").status_code == 302
-    assert client.get("/home").status_code == 302
+    assert client.get("/explorar").status_code == 302
 
 
 def test_ip_lockout_after_five_failed_attempts(app, client):
@@ -142,7 +142,7 @@ def test_ip_lockout_after_five_failed_attempts(app, client):
     response = client.post("/login", data={"email": "lock@uni.es", "password": PASSWORD})
 
     assert "Demasiados intentos fallidos" in response.get_data(as_text=True)
-    assert client.get("/home").status_code == 302  # ni con la contraseña correcta
+    assert client.get("/explorar").status_code == 302  # ni con la contraseña correcta
 
 
 def test_legacy_default_credentials_rejected_with_own_message(app, client):
@@ -154,4 +154,4 @@ def test_legacy_default_credentials_rejected_with_own_message(app, client):
     response = client.post("/login", data={"email": "user1@user.com", "password": "password1"})
 
     assert "Las credenciales por defecto están desactivadas" in response.get_data(as_text=True)
-    assert client.get("/home").status_code == 302
+    assert client.get("/explorar").status_code == 302

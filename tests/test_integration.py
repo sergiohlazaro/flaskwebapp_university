@@ -99,7 +99,7 @@ def test_admin_block_unblock_user_flow(client, app):
     # TC-007: Intento de login por parte de usuario bloqueado
     response = client.post("/login", data={"email": "user@example.com", "password": "userpass"}, follow_redirects=True)
     assert "Email o contraseña incorrectos.".encode() in response.data
-    assert client.get("/home").status_code == 302  # la cuenta bloqueada no obtiene sesión
+    assert client.get("/explorar").status_code == 302  # la cuenta bloqueada no obtiene sesión
 
     # Login como admin de nuevo
     client.post("/login", data={"email": "admin@example.com", "password": "adminpass"}, follow_redirects=True)

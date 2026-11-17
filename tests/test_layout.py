@@ -56,7 +56,7 @@ def test_landing_for_visitor_and_redirect_for_user(app, client):
     login(client, "a@example.com")
     r = client.get("/")
     assert r.status_code == 302
-    assert r.headers["Location"].endswith("/home")
+    assert r.headers["Location"].endswith("/explorar")
 
 
 def test_public_pages_in_spanish(client):
@@ -75,11 +75,11 @@ def test_old_public_urls_redirect(client):
 
 
 def test_htmx_request_without_session_gets_hx_redirect(client):
-    r = client.get("/home", headers={"HX-Request": "true"})
+    r = client.get("/explorar", headers={"HX-Request": "true"})
     assert r.status_code == 401
     assert r.headers["HX-Redirect"].startswith("/login")
     assert "next=" in r.headers["HX-Redirect"]
-    assert client.get("/home").status_code == 302
+    assert client.get("/explorar").status_code == 302
 
 
 def test_logout_requires_post(app, client):
@@ -89,7 +89,7 @@ def test_logout_requires_post(app, client):
     r = client.post("/logout")
     assert r.status_code == 302
     assert r.headers["Location"] in ("/", "http://localhost/")
-    assert client.get("/home").status_code == 302
+    assert client.get("/explorar").status_code == 302
 
 
 def test_navbar_links_for_logged_in_user(app, client):
