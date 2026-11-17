@@ -1,7 +1,7 @@
 # Diseño: rediseño de interfaz y biblioteca de material didáctico
 
 - **Fecha:** 2026-11-17
-- **Estado:** pendiente de aprobación
+- **Estado:** aprobado por el usuario (2026-11-17)
 - **Rama:** `feature/redesign`, creada a partir de `fix/audit-phase2` (que contiene las correcciones de seguridad de la Fase 2). La integración se decide al terminar, con el usuario; no se hace merge sin su permiso. Si `fix/audit-phase2` se integra antes en la rama principal, `feature/redesign` se rebasa sobre ella.
 - **Referencias:** `docs/audit/AUDIT.md` (hallazgos y estado)
 
