@@ -179,3 +179,93 @@ def test_sec03_create_admin_command_rejects_short_password(app):
     assert result.exit_code != 0
     assert "at least 8 characters" in result.output
     assert User.query.filter_by(email="boss@uni.es").first() is None
+
+
+# ---------------------------------------------------------------------------
+# SEC-05: una subida nunca sobrescribe el fichero de otro usuario
+# ---------------------------------------------------------------------------
+
+def _static(app, *parts):
+    return os.path.join(app.root_path, "static", *parts)
+
+
+def _logout(client):
+    client.get("/logout")
+
+
+def test_sec05_profile_pic_named_default_does_not_overwrite_shared_default(app, client):
+    default_path = _static(app, "profile_pics", "default.jpg")
+    with open(default_path, "rb") as fh:
+        original = fh.read()
+    user = make_user("evil@example.com")
+    login(client, "evil@example.com")
+
+    client.post(
+        "/profile",
+        data={"profile_pic": (png_bytes(color="blue"), "default.jpg")},
+        content_type="multipart/form-data",
+    )
+
+    try:
+        with open(default_path, "rb") as fh:
+            assert fh.read() == original
+    finally:
+        with open(default_path, "wb") as fh:  # restaurar si el test falla
+            fh.write(original)
+        stored = db.session.get(User, user.id).profile_pic
+        if stored != "default.jpg" and os.path.exists(_static(app, "profile_pics", stored)):
+            os.remove(_static(app, "profile_pics", stored))
+
+
+def _upload_publication(client, email, content):
+    make_user(email)
+    login(client, email)
+    client.post(
+        "/publications",
+        data={"publication": "hi", "publication_file": (io.BytesIO(content), "notes.txt", "text/plain")},
+        content_type="multipart/form-data",
+    )
+    _logout(client)
+
+
+def test_sec05_same_attachment_name_from_two_users_keeps_both_files(app, client):
+    from website.models import Publication
+    _upload_publication(client, "a@example.com", b"secret of A")
+    _upload_publication(client, "b@example.com", b"content of B")
+
+    paths = [p.file_path for p in Publication.query.order_by(Publication.id).all()]
+    try:
+        assert len(set(paths)) == 2
+        with open(_static(app, "uploads", "publications", paths[0]), "rb") as fh:
+            assert fh.read() == b"secret of A"
+    finally:
+        for p in set(paths):
+            full = _static(app, "uploads", "publications", p)
+            if os.path.exists(full):
+                os.remove(full)
+
+
+def test_sec05_message_attachments_with_same_name_are_stored_separately(app, client):
+    from website.models import Message
+    make_user("dest@example.com")
+    for sender, body in (("s1@example.com", b"one"), ("s2@example.com", b"two")):
+        make_user(sender)
+        login(client, sender)
+        client.post(
+            "/send_message",
+            data={"receiver_email": "dest@example.com", "content": "hello",
+                  "message_file": (io.BytesIO(body), "cv.txt", "text/plain")},
+            content_type="multipart/form-data",
+        )
+        _logout(client)
+
+    paths = [m.file_path for m in Message.query.order_by(Message.id).all()]
+    try:
+        assert len(set(paths)) == 2
+        with open(_static(app, "uploads", "messages", paths[0]), "rb") as fh:
+            assert fh.read() == b"one"
+    finally:
+        for p in set(paths):
+            full = _static(app, "uploads", "messages", p)
+            if os.path.exists(full):
+                os.remove(full)

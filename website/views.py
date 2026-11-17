@@ -2,6 +2,7 @@
 # IMPORTACIONES
 # ---------------------------------
 import os  # Librería para operaciones con archivos y carpetas
+import uuid  # Nombres de fichero únicos para las subidas
 from functools import wraps  # Para construir decoradores (admin_required)
 from werkzeug.utils import secure_filename  # Asegura que los nombres de archivos sean seguros para guardarlos
 from flask import Blueprint, abort, current_app, json, jsonify, redirect, render_template, url_for, request, flash
@@ -67,6 +68,13 @@ def allowed_file(filename):
 # Verifica si un archivo tiene una extensión válida para archivos en general
 def allowed_file_generic(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS_DOCS
+
+# Genera un nombre de fichero único para guardar en disco, conservando solo la
+# extensión del original. Evita que un usuario sobrescriba ficheros de otros
+# (incluida la imagen de perfil por defecto compartida).
+def unique_filename(original_name):
+    ext = secure_filename(original_name).rsplit('.', 1)[-1].lower()
+    return f"{uuid.uuid4().hex}.{ext}"
 
 # Detecta el tipo real de una imagen a partir de su contenido (sustituye a imghdr,
 # eliminado en Python 3.13). Devuelve 'png', 'jpeg', 'gif'... o None si no es imagen.
@@ -175,7 +183,7 @@ def profile():
                 if detected_type in ALLOWED_EXTENSIONS:
                     if not os.path.exists(UPLOAD_FOLDER):
                         os.makedirs(UPLOAD_FOLDER)
-                    filename = secure_filename(file.filename)
+                    filename = unique_filename(file.filename)
                     filepath = os.path.join(UPLOAD_FOLDER, filename)
 
                     image = Image.open(file)
@@ -351,7 +359,7 @@ def publications():
                 flash('Unsupported file MIME type.', category='error')
                 return redirect(url_for('views.publications'))
 
-            filename = secure_filename(file.filename)
+            filename = unique_filename(file.filename)
             upload_folder = os.path.join('website', 'static', 'uploads', 'publications')
             os.makedirs(upload_folder, exist_ok=True)
             filepath = os.path.join(upload_folder, filename)
@@ -516,7 +524,7 @@ def send_message():
             flash('Unsupported file MIME type.', category='error')
             return redirect(url_for('views.messages'))
 
-        filename = secure_filename(file.filename)
+        filename = unique_filename(file.filename)
         upload_folder = os.path.join('website', 'static', 'uploads', 'messages')
         os.makedirs(upload_folder, exist_ok=True)
         filepath = os.path.join(upload_folder, filename)
