@@ -245,6 +245,23 @@ def test_sec05_same_attachment_name_from_two_users_keeps_both_files(app, client)
                 os.remove(full)
 
 
+def test_qa03_each_login_record_gets_its_own_timestamp(app):
+    import time
+
+    from website.models import LoginRecord
+    user = make_user("clock@example.com")
+
+    first = LoginRecord(user_id=user.id, ip_address="1.1.1.1")
+    db.session.add(first)
+    db.session.commit()
+    time.sleep(1.1)
+    second = LoginRecord(user_id=user.id, ip_address="1.1.1.1")
+    db.session.add(second)
+    db.session.commit()
+
+    assert second.login_time > first.login_time
+
+
 def test_sec05_message_attachments_with_same_name_are_stored_separately(app, client):
     from website.models import Message
     make_user("dest@example.com")

@@ -92,7 +92,9 @@ class LoginRecord(db.Model):
     ip_address = db.Column(db.String(50), nullable=False)
 
     # Fecha y hora del login → Por defecto se establece a la hora local de Madrid (zona horaria definida con pytz)
-    login_time = db.Column(db.DateTime, default=datetime.now(pytz.timezone('Europe/Madrid')))
+    # IMPORTANTE: se pasa una función (lambda) para que se evalúe en cada inserción;
+    # pasar datetime.now(...) directamente fijaba la hora de arranque del servidor.
+    login_time = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/Madrid')))
 
 # -----------------------
 # MODELO DE MENSAJES
