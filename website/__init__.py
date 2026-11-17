@@ -10,6 +10,8 @@ from flask_limiter import Limiter  # Límite de solicitudes (Rate Limiting)
 from flask_limiter.util import get_remote_address  # Obtención de IP del cliente
 from flask_caching import Cache  # Sistema de cache para mejorar rendimiento
 import logging  # Registro de eventos y errores
+import os  # Lectura de variables de entorno (SECRET_KEY)
+import secrets  # Generación de claves aleatorias seguras
 from flask_compress import Compress
 
 # ----------------------------------------------
@@ -45,7 +47,17 @@ def create_app(test_config=None):
     # CONFIGURACIÓN DE LA APP
     # ------------------------------
 
-    app.config['SECRET_KEY'] = 'mysecretkeymysecretkey'  # Protección de sesiones y cookies
+    # Clave para firmar sesiones y tokens CSRF. NUNCA debe estar en el código:
+    # se lee de la variable de entorno SECRET_KEY. Si falta, se genera una clave
+    # aleatoria temporal (las sesiones se invalidan al reiniciar el servidor).
+    secret_key = os.environ.get('SECRET_KEY')
+    if not secret_key:
+        secret_key = secrets.token_hex(32)
+        logging.getLogger(__name__).warning(
+            "SECRET_KEY no está definida: usando una clave aleatoria temporal. "
+            "Defínela en el entorno para producción."
+        )
+    app.config['SECRET_KEY'] = secret_key
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_NAME}'  # Base de datos SQLite
     app.config['MAX_CONTENT_LENGTH'] = 24 * 1024 * 1024  # Límite máximo de archivos subidos (24MB)
 

@@ -101,3 +101,44 @@ def test_sec01_admin_can_still_block_user(client):
 
     assert b"User blocked" in response.data
     assert db.session.get(User, target.id).is_blocked is True
+
+
+# ---------------------------------------------------------------------------
+# SEC-02: la SECRET_KEY no puede ser la clave filtrada en el repositorio
+# ---------------------------------------------------------------------------
+
+LEAKED_KEY = "mysecretkeymysecretkey"
+TEST_DB = {"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:", "WTF_CSRF_ENABLED": False}
+
+
+def _forge_session_cookie(app, user_id, key):
+    from flask.sessions import SecureCookieSessionInterface
+    forger = app.__class__(__name__)
+    forger.config["SECRET_KEY"] = key
+    serializer = SecureCookieSessionInterface().get_signing_serializer(forger)
+    return serializer.dumps({"_user_id": str(user_id), "_fresh": True})
+
+
+def test_sec02_session_forged_with_leaked_key_is_rejected(monkeypatch):
+    from website import create_app
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    app = create_app(TEST_DB)
+    with app.app_context():
+        db.create_all()
+        admin = make_user("admin@example.com", role=0)
+        client = app.test_client()
+        client.set_cookie("session", _forge_session_cookie(app, admin.id, LEAKED_KEY))
+
+        response = client.get("/admin")
+
+        assert response.status_code == 302
+        assert "/login" in response.headers["Location"]
+
+
+def test_sec02_secret_key_is_read_from_environment(monkeypatch):
+    from website import create_app
+    monkeypatch.setenv("SECRET_KEY", "from-env-0123456789abcdef0123456789")
+
+    app = create_app(TEST_DB)
+
+    assert app.config["SECRET_KEY"] == "from-env-0123456789abcdef0123456789"

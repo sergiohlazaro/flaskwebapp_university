@@ -41,7 +41,12 @@ password: password1
     ```bash
     pip install -r requirements.txt
 
-4. **Inicia la aplicación:**
+4. **Define la clave secreta** (obligatoria en producción; sin ella se genera una temporal y las sesiones se pierden al reiniciar):
+
+    ```bash
+    export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+
+5. **Inicia la aplicación:**
 
     ```bash
     python main.py
