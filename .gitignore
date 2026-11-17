@@ -9,3 +9,4 @@ instance/
 app.log
 .claude/worktrees/
 website/static/uploads/
+.superpowers/
