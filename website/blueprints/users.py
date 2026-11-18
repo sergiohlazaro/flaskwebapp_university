@@ -24,8 +24,8 @@ from ..models import (
     ReportTarget,
     User,
 )
+from ..services.query import escape_like, favorite_ids, page_param
 from ..services.uploads import UploadError, delete_upload, save_avatar
-from .materials import MAX_PAGE, _escape_like, _favorite_ids, _int_param
 
 users = Blueprint("users", __name__)
 
@@ -35,7 +35,7 @@ LAST_ADMIN_MSG = "No puedes borrar tu cuenta: eres el último administrador acti
 
 
 def _page():
-    return min(_int_param(request.args.get("pagina")) or 1, MAX_PAGE)
+    return page_param(request.args.get("pagina"))
 
 
 def _page_url_factory(endpoint, **fixed):
@@ -63,7 +63,7 @@ def profile(user_id):
     return render_template(
         "users/profile.html", profile_user=user, pagination=pagination, page=pagination.page,
         pages=pagination.pages, page_url=_page_url_factory("users.profile", user_id=user.id),
-        favorite_ids=_favorite_ids(pagination.items),
+        favorite_ids=favorite_ids(pagination.items),
     )
 
 
@@ -75,7 +75,7 @@ def directory():
     text = (request.args.get("q") or "").strip()
     query = select(User).where(User.is_blocked.is_(False))
     if text:
-        pattern = f"%{_escape_like(text)}%"
+        pattern = f"%{escape_like(text)}%"
         full_name = User.name + " " + User.surname
         query = query.where(or_(User.name.ilike(pattern, escape="\\"), User.surname.ilike(pattern, escape="\\"),
                                 full_name.ilike(pattern, escape="\\")))

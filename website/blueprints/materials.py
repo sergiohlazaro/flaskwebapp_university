@@ -26,6 +26,7 @@ from ..models import (
     User,
 )
 from ..services.permissions import can_view_material
+from ..services.query import escape_like, favorite_ids, int_param, page_param
 from ..services.uploads import (
     ALLOWED_MATERIAL_EXTENSIONS,
     UploadError,
@@ -38,8 +39,6 @@ materials = Blueprint("materials", __name__)
 
 MAX_FILES = 5
 PER_PAGE = 12
-MAX_PAGE = 1_000_000
-MAX_INT = 2**63 - 1  # rango de INTEGER en SQLite
 NO_FILES_MSG = "Sube al menos un fichero."
 TOO_MANY_MSG = "Máximo 5 ficheros."
 
@@ -140,16 +139,6 @@ def _is_saved(material):
     return db.session.get(Favorite, (current_user.id, material.id)) is not None
 
 
-def _favorite_ids(items):
-    """Ids de los materiales de la página que el usuario actual tiene guardados (una sola consulta)."""
-    ids = [m.id for m in items]
-    if not ids:
-        return set()
-    rows = db.session.scalars(select(Favorite.material_id).where(
-        Favorite.user_id == current_user.id, Favorite.material_id.in_(ids)))
-    return set(rows)
-
-
 def _internal_referrer():
     referrer = request.referrer
     if not referrer or "\\" in referrer:
@@ -195,7 +184,7 @@ def rate(material_id):
     material = _visible_or_404(material_id)
     if material.author_id == current_user.id:
         abort(403)
-    stars = _int_param(request.form.get("stars"), minimum=0)
+    stars = int_param(request.form.get("stars"), minimum=0)
     if stars is None or stars > 5:
         abort(400)
     for attempt in range(2):
@@ -279,7 +268,7 @@ def _report_target(target_type, target_id):
     """Devuelve (tipo, id, autor_id, material_id) del contenido reportable; 404 si no existe o no es visible."""
     if target_type not in {t.value for t in ReportTarget}:
         abort(400)
-    number = _int_param(target_id)
+    number = int_param(target_id)
     if number is None:
         abort(404)
     if target_type == ReportTarget.MATERIAL.value:
@@ -344,7 +333,7 @@ def report():
 @materials.route("/guardados")
 @login_required
 def saved():
-    page = min(_int_param(request.args.get("pagina")) or 1, MAX_PAGE)
+    page = page_param(request.args.get("pagina"))
     query = (select(Material).join(Favorite, Favorite.material_id == Material.id)
              .where(Favorite.user_id == current_user.id, Material.is_hidden.is_(False))
              .order_by(Favorite.created_at.desc(), Material.id.desc()))
@@ -355,7 +344,7 @@ def saved():
 
     return render_template("materials/saved.html", pagination=pagination, page=pagination.page,
                            pages=pagination.pages, page_url=page_url,
-                           favorite_ids=_favorite_ids(pagination.items))
+                           favorite_ids=favorite_ids(pagination.items))
 
 
 @materials.route("/material/<int:material_id>/editar", methods=["GET", "POST"])
@@ -411,18 +400,6 @@ def remove_file(material_id, file_id):
     return redirect(url_for("materials.edit", material_id=material.id))
 
 
-def _int_param(value, minimum=1):
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return None
-    return number if minimum <= number <= MAX_INT else None
-
-
-def _escape_like(text):
-    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
 def build_feed_query(params: Mapping[str, str], viewer: User) -> Select:
     """Consulta del feed (sin paginar). Los valores inválidos se ignoran.
 
@@ -433,11 +410,11 @@ def build_feed_query(params: Mapping[str, str], viewer: User) -> Select:
 
     text = (params.get("q") or "").strip()
     if text:
-        pattern = f"%{_escape_like(text)}%"
+        pattern = f"%{escape_like(text)}%"
         query = query.where(or_(Material.title.ilike(pattern, escape="\\"),
                                 Material.description.ilike(pattern, escape="\\")))
 
-    subject_id = _int_param(params.get("asignatura"))
+    subject_id = int_param(params.get("asignatura"))
     if subject_id is not None and db.session.get(Subject, subject_id) is not None:
         query = query.where(Material.subject_id == subject_id)
 
@@ -469,7 +446,7 @@ def build_feed_query(params: Mapping[str, str], viewer: User) -> Select:
 @login_required
 def explore():
     params = request.args
-    page = min(_int_param(params.get("pagina")) or 1, MAX_PAGE)
+    page = page_param(params.get("pagina"))
     pagination = db.paginate(build_feed_query(params, current_user), page=page,
                              per_page=PER_PAGE, error_out=False)
 
@@ -480,7 +457,7 @@ def explore():
         return url_for("materials.explore", **args)
 
     context = {"pagination": pagination, "page": pagination.page, "pages": pagination.pages,
-               "page_url": page_url, "favorite_ids": _favorite_ids(pagination.items)}
+               "page_url": page_url, "favorite_ids": favorite_ids(pagination.items)}
     if request.headers.get("HX-Request"):
         return render_template("partials/material_list.html", **context)
     subjects = Subject.query.order_by(Subject.name_key).all()

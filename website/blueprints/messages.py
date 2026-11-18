@@ -7,6 +7,7 @@ from sqlalchemy import case, func, or_, select, update
 
 from ..extensions import db, limiter
 from ..models import Message, User
+from ..services.query import escape_like
 from ..services.uploads import (
     ALLOWED_MATERIAL_EXTENSIONS,
     UploadError,
@@ -14,7 +15,6 @@ from ..services.uploads import (
     save_upload,
     validate_upload,
 )
-from .materials import _escape_like
 
 messages = Blueprint("messages", __name__)
 
@@ -93,7 +93,7 @@ def pick_user():
     text = (request.args.get("q") or "").strip()[:100]
     results = []
     if text:
-        pattern = f"%{_escape_like(text)}%"
+        pattern = f"%{escape_like(text)}%"
         full_name = User.name + " " + User.surname
         results = db.session.scalars(
             select(User).where(

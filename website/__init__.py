@@ -9,6 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import get_config
 from .extensions import csrf, db, limiter, login_manager, migrate
+from .services.query import MAX_INT
 
 __all__ = ["create_app", "db"]
 
@@ -70,7 +71,7 @@ def create_app(test_config=None):
     class BoundedIntConverter(IntegerConverter):
         """Como `int`, pero fuera del rango de SQLite (64 bits) no casa: 404 en vez de 500."""
 
-        def __init__(self, map, fixed_digits=0, min=None, max=2**63 - 1, signed=False):
+        def __init__(self, map, fixed_digits=0, min=None, max=MAX_INT, signed=False):
             super().__init__(map, fixed_digits=fixed_digits, min=min, max=max, signed=signed)
 
     app.url_map.converters["int"] = BoundedIntConverter

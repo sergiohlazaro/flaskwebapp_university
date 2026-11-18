@@ -20,13 +20,12 @@ from ..models import (
     utcnow,
 )
 from ..services.permissions import admin_required
+from ..services.query import escape_like, page_param
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 
 DUPLICATE_MSG = "Ya existe una asignatura con ese nombre."
 USERS_PER_PAGE = 20
-MAX_INT = 2**63 - 1
-MAX_PAGE = 1_000_000
 EXCERPT_LEN = 120
 STATUS_BY_SLUG = {
     "pendiente": ReportStatus.PENDING,
@@ -41,18 +40,6 @@ def _tabs_context():
         select(func.count(Report.id)).where(Report.status == ReportStatus.PENDING)
     )
     return {"pending_reports_count": count or 0}
-
-
-def _page_param(value):
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return 1
-    return min(number, MAX_PAGE) if 1 <= number <= MAX_INT else 1
-
-
-def _escape_like(text):
-    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 @admin.route("")
@@ -71,13 +58,13 @@ def users():
     q = request.args.get("q", "").strip()[:100]
     query = select(User).order_by(User.name, User.surname, User.id)
     if q:
-        pattern = f"%{_escape_like(q)}%"
+        pattern = f"%{escape_like(q)}%"
         full_name = User.name + " " + User.surname
         query = query.where(
             User.name.ilike(pattern, escape="\\") | User.surname.ilike(pattern, escape="\\")
             | User.email.ilike(pattern, escape="\\") | full_name.ilike(pattern, escape="\\")
         )
-    page = _page_param(request.args.get("pagina"))
+    page = page_param(request.args.get("pagina"))
     pagination = db.paginate(query, page=page, per_page=USERS_PER_PAGE, error_out=False)
 
     def page_url(number):
