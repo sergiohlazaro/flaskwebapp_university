@@ -236,6 +236,23 @@ def hidden():
     return render_template("admin/hidden.html", materials=materials, comments=comments, active_tab="hidden")
 
 
+@admin.route("/oculto/<target_type>/<int:target_id>/ocultar", methods=["POST"])
+@login_required
+@admin_required
+def hide(target_type, target_id):
+    """Ocultar contenido sin reporte previo (spec §5.1); resuelve los reportes pendientes."""
+    kind = {"material": ReportTarget.MATERIAL, "comment": ReportTarget.COMMENT}.get(target_type) or abort(404)
+    model = Material if kind is ReportTarget.MATERIAL else Comment
+    item = db.session.get(model, target_id) or abort(404)
+    item.is_hidden = True
+    resolve_pending_reports(kind, item.id, current_user.id)
+    db.session.commit()
+    flash("Contenido ocultado.", "success")
+    if kind is ReportTarget.MATERIAL:
+        return redirect(url_for("materials.detail", material_id=item.id))
+    return redirect(url_for("materials.detail", material_id=item.material_id) + f"#comment-{item.id}")
+
+
 @admin.route("/oculto/<target_type>/<int:target_id>/restaurar", methods=["POST"])
 @login_required
 @admin_required

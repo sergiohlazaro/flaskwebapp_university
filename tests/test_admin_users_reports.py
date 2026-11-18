@@ -28,6 +28,8 @@ ROUTES = [
     ("post", "/admin/reportes/1/descartar"),
     ("get", "/admin/oculto"),
     ("post", "/admin/oculto/material/1/restaurar"),
+    ("post", "/admin/oculto/material/1/ocultar"),
+    ("post", "/admin/oculto/comment/1/ocultar"),
     ("post", "/admin/oculto/comment/1/restaurar"),
     ("get", "/admin/asignaturas"),
     ("post", "/admin/asignaturas"),
@@ -308,3 +310,67 @@ def test_teacher_badge_follows_current_flag(client):
     client.post(f"/admin/usuarios/{teacher.id}/profesor")
     assert admin.is_admin
     assert "Profesor/a" not in client.get("/explorar").get_data(as_text=True)
+
+
+# --- Ocultar sin reporte previo (spec §5.1) -------------------------------------
+
+def test_admin_hides_material_without_report(client):
+    author = make_user("autor@example.com")
+    material = _material(author)
+    _admin(client)
+    r = client.post(f"/admin/oculto/material/{material.id}/ocultar")
+    assert r.status_code == 302
+    assert db.session.get(Material, material.id).is_hidden is True
+
+
+def test_admin_hides_comment_and_resolves_pending_reports(client):
+    author = make_user("autor@example.com")
+    reporter = make_user("rep@example.com")
+    material = _material(author)
+    comment = _comment(material, author)
+    report = _report(reporter, ReportTarget.COMMENT, comment.id)
+    other = _report(reporter, ReportTarget.MATERIAL, material.id)
+    admin = _admin(client)
+    r = client.post(f"/admin/oculto/comment/{comment.id}/ocultar")
+    assert r.status_code == 302 and f"/material/{material.id}" in r.headers["Location"]
+    assert db.session.get(Comment, comment.id).is_hidden is True
+    done = db.session.get(Report, report.id)
+    assert done.status is ReportStatus.RESOLVED and done.resolved_by_id == admin.id and done.resolved_at
+    assert db.session.get(Report, other.id).status is ReportStatus.PENDING
+
+
+def test_admin_hide_resolves_material_reports(client):
+    author = make_user("autor@example.com")
+    reporter = make_user("rep@example.com")
+    material = _material(author)
+    report = _report(reporter, ReportTarget.MATERIAL, material.id)
+    _admin(client)
+    client.post(f"/admin/oculto/material/{material.id}/ocultar")
+    assert db.session.get(Report, report.id).status is ReportStatus.RESOLVED
+
+
+def test_hide_non_admin_forbidden_and_unknown_type_404(client):
+    author = make_user("autor@example.com")
+    material = _material(author)
+    login(client, "autor@example.com")
+    assert client.post(f"/admin/oculto/material/{material.id}/ocultar").status_code == 403
+    assert db.session.get(Material, material.id).is_hidden is False
+    client.post("/logout")
+    _admin(client)
+    assert client.post(f"/admin/oculto/user/{material.id}/ocultar").status_code == 404
+    assert client.post("/admin/oculto/material/99999/ocultar").status_code == 404
+    assert client.post("/admin/oculto/comment/99999/ocultar").status_code == 404
+
+
+def test_hide_buttons_shown_to_admin_only(client):
+    author = make_user("autor@example.com")
+    material = _material(author)
+    comment = _comment(material, author)
+    login(client, "autor@example.com")
+    html = client.get(f"/material/{material.id}").get_data(as_text=True)
+    assert "/ocultar" not in html
+    client.post("/logout")
+    _admin(client)
+    html = client.get(f"/material/{material.id}").get_data(as_text=True)
+    assert f"/admin/oculto/material/{material.id}/ocultar" in html
+    assert f"/admin/oculto/comment/{comment.id}/ocultar" in html
