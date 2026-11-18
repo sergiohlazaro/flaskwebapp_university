@@ -142,7 +142,8 @@ Haz copia de seguridad de la carpeta `instance/` completa: contiene la base de d
 | Dar el distintivo de profesor, bloquear o desbloquear | Admin → **Usuarios** |
 | Moderar un reporte | Admin → **Reportes** → ocultar el contenido o descartar el reporte |
 | Empezar con la base de datos vacía | Para la app, borra `instance/database.db` y ejecuta `flask --app main db upgrade` y `create-admin` |
-| Actualizar a la última versión | `git pull`, `pip install -r requirements.txt` y `flask --app main db upgrade` |
+| Actualizar a la última versión | Si ya usas la versión rediseñada: `git pull`, `pip install -r requirements.txt` y `flask --app main db upgrade` |
+| Pasar desde la versión anterior al rediseño | **Los datos de la versión anterior no se migran.** Borra `instance/database.db`, ejecuta `flask --app main db upgrade` y vuelve a crear el administrador con `create-admin` (haz antes copia de `instance/` si quieres conservarla) |
 | Cambiar el modelo de datos (desarrollo) | Edita `website/models.py`, ejecuta `flask --app main db migrate -m "descripción"`, revisa el script de `migrations/versions/` y aplícalo con `db upgrade` |
 
 ---

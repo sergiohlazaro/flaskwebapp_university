@@ -29,7 +29,7 @@
 | ID | Severidad | Estado | Commit(s) | Notas |
 |---|---|---|---|---|
 | SEC-01 | Crítica | **Corregido** | `1823304` | Decorador `admin_required` (403) en `/block_user` y `/unblock_user`. |
-| SEC-02 | Crítica | **Corregido** | `8c520e5` | `SECRET_KEY` desde el entorno; clave aleatoria por proceso si falta. **Hay que considerar comprometida la clave antigua.** Residual pendiente: si se despliega con varios workers sin `SECRET_KEY`, cada uno usa una clave distinta y las sesiones fallan; el aviso del log y el README solo mencionan el reinicio. Conviene exigir la variable fuera de desarrollo. |
+| SEC-02 | Crítica | **Corregido** | `8c520e5` | `SECRET_KEY` desde el entorno; clave aleatoria por proceso si falta. **Hay que considerar comprometida la clave antigua.** El residual descrito en esta fase (varios workers sin `SECRET_KEY`) se cerró después: en producción la variable es obligatoria y la aplicación falla al arrancar con `RuntimeError` si falta (ver 0b); la clave aleatoria solo se usa en desarrollo. |
 | SEC-03 | Crítica | **Corregido** | `c3bce33`, `b04a94c` | Sin seed; comando `flask --app main create-admin`; login con las credenciales por defecto antiguas rechazado en BDs existentes. |
 | SEC-04 | Alta | Pendiente: requiere diseño | — | Decidir almacenamiento fuera de `static/` y ruta autenticada. SEC-05 lo mitiga en parte: los ficheros nuevos tienen nombres UUID imposibles de adivinar, pero quien conozca la URL puede descargarlos sin login. |
 | SEC-05 | Alta | **Corregido** | `10155d9` | Subidas guardadas como `<uuid4>.<ext>`. Los ficheros subidos antes conservan su nombre. |
@@ -73,7 +73,7 @@
 | QA-05 | **Corregido** | Registro y demás acciones usan POST-redirect-GET. |
 | QA-06 | **Corregido** | Se elimina `bleach`: se guarda texto plano y Jinja escapa una sola vez. |
 | QA-07 | **Corregido** | Los perfiles y listados son rutas nuevas con paginación propia. |
-| QA-08 | **Corregido** | Borrar material, mensajes o cuentas elimina también los ficheros del disco. |
+| QA-08 | **Corregido** | Borrar un material, quitar un fichero de un material o borrar una cuenta elimina también los ficheros del disco (en la cuenta, además, avatar y adjuntos de mensajes). No existe ninguna ruta para borrar mensajes sueltos, así que no hay ficheros huérfanos por ese camino. |
 | QA-09 | **Corregido** | Eliminados `views.py` antiguo, `Publication`, plantillas heredadas, `logo.jpg` y las imágenes/estáticos sin uso; `ruff check .` limpio. |
 | QA-10 | **Corregido** | Una sola implementación de subida y validación (`services/uploads.py`). |
 | QA-11 | **Corregido** | `requirements.txt` solo con dependencias de ejecución; `pytest`, `pytest-cov`, `ruff` y `pip-audit` en `requirements-dev.txt`. Nota: `rich`, `markdown-it-py`, `mdurl` y `Pygments` se mantienen porque son dependencias de Flask-Limiter. |
@@ -84,9 +84,11 @@
 | QA-16 | **Corregido** | Fechas guardadas en UTC con zona y mostradas en `Europe/Madrid` mediante el filtro `localtime`. |
 | QA-17 | **Corregido** | Ficheros subidos bajo `app.instance_path`/`UPLOAD_ROOT`, no relativos al directorio de trabajo. |
 
+**Revisión final (correcciones ya en el código):** páginas de error en español y manejo de `CSRFError`; los reportes de contenido borrado se eliminan (con migración de SQLite `AUTOINCREMENT` para no reutilizar ids); el `next` del login solo acepta URLs que admiten GET; la cookie «recordarme» lleva `HttpOnly`, `SameSite=Lax` y `Secure` en producción; las imágenes subidas tienen un tope de píxeles antes de decodificarse; los administradores pueden ocultar cualquier material o comentario sin reporte previo; borrar materiales, ficheros y comentarios pide confirmación (con JS).
+
 **Pendiente:**
 - **SEC-10:** el límite de intentos de login sigue en memoria por proceso (Flask-Limiter sin almacenamiento compartido).
-- **SEC-11:** el login sigue usando `remember=True` y no hay política de caducidad de sesión.
+- **SEC-11:** el login sigue usando `remember=True` y no hay política de caducidad de sesión (la cookie sí está endurecida: `HttpOnly`, `SameSite`, `Secure` en producción).
 - **SEC-13:** `LoginRecord` guarda la IP sin plazo de retención.
 
 ---
