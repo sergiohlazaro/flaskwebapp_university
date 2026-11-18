@@ -107,6 +107,10 @@ def create_app(test_config=None):
 
     register_error_handlers(app)
 
+    from .services.mail import init_mail
+
+    init_mail(app)
+
     from .services.headers import register_security_headers
 
     register_security_headers(app)

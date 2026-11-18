@@ -1,0 +1,9 @@
+Hola {{ name }},
+
+Alguien ha intentado registrarse en {{ app_name }} con tu dirección de email, pero ya tienes una cuenta.
+
+Si has sido tú, puedes iniciar sesión o recuperar tu contraseña aquí:
+
+{{ link }}
+
+Si no has sido tú, no hace falta que hagas nada.
