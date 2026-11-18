@@ -110,6 +110,13 @@ def test_relevance_without_valid_terms_ignores_q(app, client, user):
     assert ">Alfa<" in html and "Más relevantes" not in html
 
 
+def test_relevance_option_hidden_when_q_has_no_valid_terms(app, client, user):
+    _material(user, _subject("Redes"), "Alfa")
+    html = client.get("/explorar?q=!!!").get_data(as_text=True)
+    assert ">Alfa<" in html and "Más relevantes" not in html
+    assert "Más relevantes" in client.get("/explorar?q=alfa").get_data(as_text=True)
+
+
 def test_search_combines_with_filters_and_excludes_hidden(app, client, user):
     s1, s2 = _subject("Redes"), _subject("Bases")
     _material(user, s1, "Alfa", "grafos")

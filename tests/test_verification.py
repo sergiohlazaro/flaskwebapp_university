@@ -62,6 +62,16 @@ def test_verification_off_keeps_current_behaviour(app, client):
     assert "Ya existe una cuenta con ese email." in dup.get_data(as_text=True)
 
 
+def test_signup_existing_unverified_resends_verification(app_verify, vclient):
+    make_user("pend@uni.es", verified=False)
+    response = _signup(vclient, "pend@uni.es")
+    assert response.status_code == 302 and response.headers["Location"].endswith("/login")
+    assert SIGNUP_MSG in vclient.get(response.headers["Location"]).get_data(as_text=True)
+    [mail] = sent_emails()
+    assert mail["to"] == "pend@uni.es"
+    assert "/verificar/" in mail["body"] and "Alguien ha intentado registrarse" not in mail["body"]
+
+
 @pytest.mark.parametrize("email", ["new@uni.es", "taken@uni.es"])
 def test_signup_with_verification_same_response(app_verify, vclient, email):
     make_user("taken@uni.es")

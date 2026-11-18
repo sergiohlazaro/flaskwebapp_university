@@ -73,6 +73,26 @@ def test_reset_flow_changes_password_and_bumps_version(app, client):
     assert INVALID in reuse.get_data(as_text=True)
 
 
+def test_successful_reset_clears_account_lock_not_ip(app, client):
+    from website.models import AuthThrottle
+    make_user("Exists@uni.es".lower())
+    for _ in range(5):
+        client.post("/login", data={"email": "exists@uni.es", "password": "mala-mala-1"},
+                    environ_base={"REMOTE_ADDR": "10.0.0.9"})
+    assert db.session.get(AuthThrottle, "acct:exists@uni.es").locked_until is not None
+    client.post("/recuperar", data={"email": "exists@uni.es"})
+    link = _link(sent_emails()[0]["body"])
+    assert client.post(link, data={"password": "nuevaclave1", "password2": "nuevaclave1"}).status_code == 302
+    assert db.session.get(AuthThrottle, "acct:exists@uni.es") is None
+    assert db.session.get(AuthThrottle, "ip:10.0.0.9") is not None
+
+
+def test_forgot_password_overlong_email_same_response(app, client):
+    page = client.post("/recuperar", data={"email": "a" * 400 + "@uni.es"}, follow_redirects=True)
+    assert GENERIC in page.get_data(as_text=True)
+    assert sent_emails() == []
+
+
 def test_blocked_user_can_reset_but_not_login(app, client):
     user = make_user("b@uni.es")
     user.is_blocked = True
@@ -139,6 +159,14 @@ def test_admin_generates_reset_link(app, client):
     token = link.rsplit("/", 1)[1]
     assert link.startswith("http")
     assert tokens.load_reset_token(token) == target
+
+
+def test_admin_reset_link_is_not_cacheable(app, client):
+    make_user("admin@uni.es", role=0)
+    target = make_user("u@uni.es")
+    login(client, "admin@uni.es")
+    response = client.post(f"/admin/usuarios/{target.id}/enlace-recuperacion")
+    assert "no-store" in response.headers["Cache-Control"]
 
 
 def test_admin_reset_link_not_logged(app, client):

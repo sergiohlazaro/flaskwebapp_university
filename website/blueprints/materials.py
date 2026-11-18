@@ -493,7 +493,8 @@ def explore():
         return url_for("materials.explore", **args)
 
     context = {"pagination": pagination, "page": pagination.page, "pages": pagination.pages,
-               "page_url": page_url, "favorite_ids": favorite_ids(pagination.items)}
+               "page_url": page_url,
+               "can_rank": build_match((params.get("q") or "").strip()) is not None, "favorite_ids": favorite_ids(pagination.items)}
     # Misma URL para fragmento y página completa: las cachés deben distinguirlas (Vary) y al
     # volver con «Atrás» htmx pide la página completa (HX-History-Restore-Request).
     if request.headers.get("HX-Request") and not request.headers.get("HX-History-Restore-Request"):

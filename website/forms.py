@@ -27,14 +27,19 @@ def _strip(value):
 
 
 class LoginForm(FlaskForm):
-    # Sin validador Email: el login debe responder igual ante cualquier credencial errónea.
-    email = StringField("Email", filters=[_strip_lower], validators=[DataRequired(REQUIRED)])
+    # Sin validador Email: el login debe responder igual ante cualquier credencial errónea
+    # (un email desmesurado recibe el mismo mensaje genérico y no genera claves de throttle).
+    email = StringField("Email", filters=[_strip_lower], validators=[
+        DataRequired(REQUIRED),
+        Length(max=320, message="Email o contraseña incorrectos."),
+    ])
     password = PasswordField("Contraseña", validators=[DataRequired(REQUIRED)])
     remember = BooleanField("Recordarme", default=False)
 
 
 class ForgotPasswordForm(FlaskForm):
-    email = StringField("Email", filters=[_strip_lower], validators=[DataRequired(REQUIRED)])
+    # Los emails desmesurados no validan; las vistas responden igual que ante cualquier otro email.
+    email = StringField("Email", filters=[_strip_lower], validators=[DataRequired(REQUIRED), Length(max=320)])
 
 
 class ResetPasswordForm(FlaskForm):

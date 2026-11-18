@@ -5,6 +5,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    make_response,
     redirect,
     render_template,
     request,
@@ -158,7 +159,9 @@ def reset_link(user_id):
     link = url_for("auth.reset_password", token=make_reset_token(user), _external=True)
     # Sin el token en el log general.
     current_app.logger.info(f"admin {current_user.id} generó un enlace de recuperación para el usuario {user.id}")
-    return render_template("admin/reset_link.html", target=user, link=link, active_tab="users")
+    response = make_response(render_template("admin/reset_link.html", target=user, link=link, active_tab="users"))
+    response.headers["Cache-Control"] = "no-store"  # el enlace es una credencial
+    return response
 
 
 @admin.route("/usuarios/<int:user_id>/accesos")

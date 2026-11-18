@@ -118,7 +118,9 @@ def _send_verification(user, email):
 def _signup_existing(email):
     # Misma respuesta que un registro nuevo; el aviso va solo al dueño del email.
     owner = User.query.filter_by(email=email).first()
-    if owner is not None:
+    if owner is not None and owner.email_verified_at is None:
+        _send_verification(owner, owner.email)  # cuenta pendiente: se reenvía el enlace de activación
+    elif owner is not None:
         link = url_for('auth.forgot_password', _external=True)
         send_email(owner.email, "Intento de registro con tu email", "email/signup_existing.txt",
                    name=owner.name, link=link)
@@ -182,12 +184,17 @@ FORGOT_MESSAGE = "Si existe una cuenta con ese email, te hemos enviado un enlace
 RESET_DONE_MESSAGE = "Contraseña actualizada. Ya puedes iniciar sesión."
 
 
+def _overlong_email(form):
+    """POST con un email desmesurado: mismo flujo y respuesta que cualquier email desconocido."""
+    return request.method == "POST" and len(form.email.data or "") > 320
+
+
 @auth.route('/recuperar', methods=['GET', 'POST'])
 @limiter.limit("5 per hour", methods=["POST"])  # Por IP; solo cuentan los envíos
 def forgot_password():
     form = ForgotPasswordForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data).first()
+    if form.validate_on_submit() or _overlong_email(form):
+        user = None if _overlong_email(form) else User.query.filter_by(email=form.email.data).first()
         # Misma respuesta exista, no exista o esté bloqueada la cuenta (sin enumeración).
         if user and not user.is_blocked:
             link = url_for('auth.reset_password', token=make_reset_token(user), _external=True)
@@ -207,6 +214,8 @@ def reset_password(token):
     if form.validate_on_submit():
         user.password = generate_password_hash(form.password.data, method='pbkdf2:sha256')
         bump_session_version(user)  # un único commit: hash y versión juntos; no inicia sesión
+        # Quien recupera el acceso no debe seguir bloqueado por la cuenta (la IP no se toca).
+        throttle.reset([throttle.login_keys("", user.email)[1]])
         flash(RESET_DONE_MESSAGE, category='success')
         return redirect(url_for('auth.login'))
     return render_template("auth/reset.html", form=form, token=token)
@@ -220,8 +229,8 @@ def reset_password(token):
 @limiter.limit("5 per hour", methods=["POST"])  # Por IP; solo cuentan los envíos
 def resend_verification():
     form = ForgotPasswordForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data).first()
+    if form.validate_on_submit() or _overlong_email(form):
+        user = None if _overlong_email(form) else User.query.filter_by(email=form.email.data).first()
         # Misma respuesta exista, esté verificada o bloqueada la cuenta (sin enumeración).
         if user and not user.is_blocked and user.email_verified_at is None:
             _send_verification(user, user.email)

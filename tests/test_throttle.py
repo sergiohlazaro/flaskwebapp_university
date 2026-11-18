@@ -106,6 +106,13 @@ def test_success_resets_both_keys(app, client):
     assert db.session.get(AuthThrottle, "ip:10.0.0.1") is None
 
 
+def test_login_overlong_email_is_generic_and_not_stored(app, client):
+    response = _post(client, "a" * 400 + "@uni.es", "x")
+    assert response.status_code == 200
+    assert GENERIC in _text(response)
+    assert db.session.query(AuthThrottle).filter(db.func.length(AuthThrottle.key) > 200).count() == 0
+
+
 def test_blocked_user_counts_but_unverified_correct_password_does_not(app, client):
     user = make_user("b@uni.es")
     user.is_blocked = True

@@ -309,7 +309,7 @@ Tras la auditoría de [`docs/audit/AUDIT.md`](docs/audit/AUDIT.md) y el rediseñ
 - Borra por política los datos personales caducados (IP de los accesos a los 90 días, avisos leídos, intentos) con `purge-data` y el log solo guarda ids, nunca emails (SEC-13).
 - Usa versiones de dependencias sin vulnerabilidades conocidas (`pip-audit`).
 
-**Mitigado** (ver la auditoría): SEC-09 queda cerrado del todo al activar el envío real de emails (`MAIL_BACKEND=smtp`); mientras tanto el registro revela si un email ya existe.
+**Mitigado** (ver la auditoría): SEC-09 queda cerrado al activar el envío real de emails (`MAIL_BACKEND=smtp`, que activa la verificación de email: registro y cambio de email responden igual exista o no la dirección); con la verificación desactivada (por ejemplo con el backend `log`) el registro y el cambio de email siguen indicando que un email ya existe, por diseño.
 
 Si encuentras un fallo de seguridad, comunícalo en privado al autor del repositorio en lugar de abrir un issue público.
 
@@ -323,7 +323,7 @@ Si encuentras un fallo de seguridad, comunícalo en privado al autor del reposit
 | `flask: command not found` | El entorno virtual no está activo. Ejecuta `source .venv/bin/activate` (o `.venv\Scripts\Activate.ps1` en Windows). |
 | En el log aparece `SECRET_KEY no está definida` | Falta el paso 4 de la instalación. Funciona, pero las sesiones se pierden al reiniciar. |
 | Inicio sesión y vuelvo a la pantalla de login | La cookie de sesión está marcada como "solo HTTPS". Chrome y Firefox la aceptan en `http://127.0.0.1`, pero Safari no. Usa Chrome o Firefox en desarrollo. |
-| "Demasiados intentos. Inténtalo de nuevo en unos minutos." | Tras 5 intentos fallidos la IP queda bloqueada 10 minutos (la cuenta, 15). Los contadores están en la base de datos: espera, o ejecuta `flask --app main purge-data` pasado el plazo. Un reinicio no los borra. |
+| "Demasiados intentos. Inténtalo de nuevo en unos minutos." | Tras 5 intentos fallidos la IP queda bloqueada 10 minutos (la cuenta, 15). Los contadores están en la base de datos: espera 10-15 minutos. Un reinicio no los borra. Restablecer la contraseña desbloquea la cuenta, pero el bloqueo de la IP puede durar hasta 10 minutos. |
 | No me llega el email de recuperación o de verificación | Con `MAIL_BACKEND=log` (por defecto) no se envía nada: abre `instance/mail.log`. Con `smtp`, revisa `MAIL_SERVER`, el puerto y las credenciales; un fallo de envío no se muestra al usuario, solo queda como error en el log de la aplicación. |
 | La app no arranca con `Esta instalación de SQLite no incluye FTS5` | Tu SQLite no trae FTS5. Usa un Python con SQLite reciente (el de python.org o el de tu distribución más nueva) y recrea el entorno virtual. |
 | La búsqueda no encuentra material que sí existe | Reconstruye el índice con `flask --app main reindex-search`. |

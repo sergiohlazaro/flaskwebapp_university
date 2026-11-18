@@ -10,7 +10,7 @@
         <div class="col-12 col-lg-3">
             <label class="form-label small" for="f-q">Buscar</label>
             <input class="form-control" id="f-q" type="search" name="q" value="{{ filters.get('q', '') }}"
-                   placeholder="Título o descripción" maxlength="100">
+                   placeholder="Título, descripción, asignatura o autor" maxlength="100">
         </div>
         <div class="col-6 col-lg-2">
             <label class="form-label small" for="f-asignatura">Asignatura</label>
@@ -44,10 +44,10 @@
             <select class="form-select" id="f-orden" name="orden">
                 {% set q_text = filters.get('q', '').strip() %}
                 {% set order = filters.get('orden') if filters.get('orden') in ('recientes', 'valorados', 'relevantes') else '' %}
-                {% if q_text %}
+                {% if can_rank %}
                 <option value="relevantes" {{ 'selected' if order in ('', 'relevantes') }}>Más relevantes</option>
                 {% endif %}
-                <option value="recientes" {{ 'selected' if order == 'recientes' or (not q_text and order != 'valorados') }}>Más recientes</option>
+                <option value="recientes" {{ 'selected' if order == 'recientes' or (not can_rank and order != 'valorados') }}>Más recientes</option>
                 <option value="valorados" {{ 'selected' if order == 'valorados' }}>Mejor valorados</option>
             </select>
         </div>

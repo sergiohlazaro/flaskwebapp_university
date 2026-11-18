@@ -55,6 +55,7 @@ class TestingConfig(BaseConfig):
     RATELIMIT_ENABLED = False
     RATELIMIT_STORAGE_URI = "memory://"
     MAIL_BACKEND = "memory"
+    REQUIRE_EMAIL_VERIFICATION = False  # los tests que la necesitan la activan explícitamente
 
 
 class ProductionConfig(BaseConfig):
