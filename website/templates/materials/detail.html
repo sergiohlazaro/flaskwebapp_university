@@ -23,7 +23,8 @@
             <a class="btn btn-sm btn-outline-primary" href="{{ url_for('materials.edit', material_id=material.id) }}"><i class="bi bi-pencil" aria-hidden="true"></i> Editar</a>
             {% endif %}
             {% if is_author or current_user.is_admin %}
-            <form method="post" action="{{ url_for('materials.delete', material_id=material.id) }}">
+            <form method="post" action="{{ url_for('materials.delete', material_id=material.id) }}"
+                  data-confirm="¿Borrar este material? Esta acción no se puede deshacer.">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Borrar</button>
             </form>

@@ -54,7 +54,8 @@
                 {% for f in material.files %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-file-earmark" aria-hidden="true"></i> {{ f.original_name }}</span>
-                    <form method="post" action="{{ url_for('materials.remove_file', material_id=material.id, file_id=f.id) }}">
+                    <form method="post" action="{{ url_for('materials.remove_file', material_id=material.id, file_id=f.id) }}"
+                          data-confirm="¿Quitar este fichero del material?">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-outline-danger btn-sm">Quitar</button>
                     </form>
@@ -62,7 +63,8 @@
                 {% endfor %}
             </ul>
         </div></div>
-        <form method="post" action="{{ url_for('materials.delete', material_id=material.id) }}">
+        <form method="post" action="{{ url_for('materials.delete', material_id=material.id) }}"
+              data-confirm="¿Borrar este material? Esta acción no se puede deshacer.">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash" aria-hidden="true"></i> Borrar material</button>
         </form>

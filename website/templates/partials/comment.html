@@ -16,7 +16,8 @@
         {% if comment.author_id == current_user.id or current_user.is_admin %}
         <form method="post" action="{{ url_for('materials.delete_comment', comment_id=comment.id) }}"
               hx-post="{{ url_for('materials.delete_comment', comment_id=comment.id) }}"
-              hx-target="#comment-list" hx-swap="outerHTML">
+              hx-target="#comment-list" hx-swap="outerHTML"
+              hx-confirm="¿Borrar este comentario?" data-confirm="¿Borrar este comentario?">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-link text-danger p-0" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Borrar</button>
         </form>

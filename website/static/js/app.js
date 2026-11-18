@@ -11,6 +11,17 @@
         });
     }
 
+    // Confirmación de acciones destructivas (sin JS inline). Los formularios con
+    // hx-confirm los confirma htmx; aquí solo los que se envían de forma normal.
+    document.addEventListener("submit", function (event) {
+        var form = event.target;
+        if (!form || !form.getAttribute || form.hasAttribute("hx-confirm")) { return; }
+        var message = form.getAttribute("data-confirm");
+        if (message && !window.confirm(message)) {
+            event.preventDefault();
+        }
+    });
+
     // CSRF para htmx
     var meta = document.querySelector('meta[name="csrf-token"]');
     var csrfToken = meta ? meta.getAttribute("content") : "";

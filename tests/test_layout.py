@@ -99,3 +99,26 @@ def test_navbar_links_for_logged_in_user(app, client):
     assert f'href="/u/{user.id}"' in html
     assert "/materiales/nuevo" not in html
     assert "/perfil" not in html
+
+
+def test_destructive_forms_carry_confirmation_attributes(client):
+    from tests.test_comments_reports import _comment, _material
+    author = make_user("autor@example.com")
+    material = _material(author)
+    comment = _comment(material, author)
+    login(client, "autor@example.com")
+    detail = client.get(f"/material/{material.id}").get_data(as_text=True)
+    assert f'action="/material/{material.id}/borrar"' in detail
+    delete_form = detail[detail.index(f'action="/material/{material.id}/borrar"') - 40:][:300]
+    assert 'data-confirm="¿Borrar este material? Esta acción no se puede deshacer."' in delete_form
+    comment_form = detail[detail.index(f'action="/comentarios/{comment.id}/borrar"') - 40:][:500]
+    assert 'hx-confirm="¿Borrar este comentario?"' in comment_form
+    edit = client.get(f"/material/{material.id}/editar").get_data(as_text=True)
+    assert 'data-confirm="¿Quitar este fichero del material?"' in edit
+
+
+def test_app_js_has_delegated_confirm_listener():
+    from pathlib import Path
+    js = Path(__file__).resolve().parent.parent / "website" / "static" / "js" / "app.js"
+    text = js.read_text(encoding="utf-8")
+    assert "data-confirm" in text and "window.confirm" in text
