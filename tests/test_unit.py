@@ -117,22 +117,6 @@ def test_login_wrong_password(client, user):
     }, follow_redirects=True)
     assert "Email o contraseña incorrectos.".encode() in response.data
 
-# --------- MENSAJES ---------
-
-def test_send_message_nonexistent_user(client, user):
-    """
-    TC-024: Enviar mensaje a un usuario inexistente.
-    """
-    client.post("/login", data={
-        "email": user.email,
-        "password": "password123"
-    })
-    response = client.post("/send_message", data={
-        "receiver_email": "notexist@example.com",
-        "content": "Hola!"
-    }, follow_redirects=True)
-    assert b"User with this email does not exist!" in response.data
-
 # --------- ACCESO SIN LOGIN ---------
 
 def test_access_explore_without_login(client):

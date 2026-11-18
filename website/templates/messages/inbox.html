@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Mensajes · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Mensajes</h1>
+    {% if not picker %}<a class="btn btn-primary btn-sm" href="{{ url_for('messages.pick_user') }}"><i class="bi bi-pencil-square" aria-hidden="true"></i> Nuevo mensaje</a>{% endif %}
+</div>
+{% if picker %}
+<div class="card"><div class="card-body">
+    <form method="get" action="{{ url_for('messages.pick_user') }}" role="search" class="mb-3">
+        <label class="form-label" for="picker-q">¿A quién quieres escribir?</label>
+        <input type="search" id="picker-q" name="q" value="{{ q }}" class="form-control" maxlength="100" autocomplete="off"
+               placeholder="Nombre o apellidos" hx-get="{{ url_for('messages.pick_user') }}" hx-trigger="input changed delay:300ms"
+               hx-target="#picker-results" hx-swap="outerHTML">
+        <noscript><button type="submit" class="btn btn-primary mt-2">Buscar</button></noscript>
+    </form>
+    {% include "partials/user_picker.html" %}
+    <a class="d-inline-block mt-3" href="{{ url_for('messages.inbox') }}">Volver a mis mensajes</a>
+</div></div>
+{% else %}
+<div class="row g-3">
+    <div class="col-md-4"><div class="card">{% include "partials/conversation_list.html" %}</div></div>
+    <div class="col-md-8 d-none d-md-block">
+        <div class="text-center text-secondary py-5">
+            <i class="bi bi-chat-dots fs-1" aria-hidden="true"></i>
+            <p class="mt-2 mb-0">Elige una conversación o empieza una nueva.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

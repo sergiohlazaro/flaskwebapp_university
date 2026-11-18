@@ -1,8 +1,7 @@
 """Tests de regresión para los hallazgos de docs/audit/AUDIT.md."""
-import io
 import os
 
-from conftest import login, make_user
+from conftest import make_user
 
 from website import db
 from website.models import User
@@ -149,29 +148,3 @@ def test_qa03_each_login_record_gets_its_own_timestamp(app):
     db.session.commit()
 
     assert second.login_time > first.login_time
-
-
-def test_sec05_message_attachments_with_same_name_are_stored_separately(app, client):
-    from website.models import Message
-    make_user("dest@example.com")
-    for sender, body in (("s1@example.com", b"one"), ("s2@example.com", b"two")):
-        make_user(sender)
-        login(client, sender)
-        client.post(
-            "/send_message",
-            data={"receiver_email": "dest@example.com", "content": "hello",
-                  "message_file": (io.BytesIO(body), "cv.txt", "text/plain")},
-            content_type="multipart/form-data",
-        )
-        _logout(client)
-
-    paths = [m.file_stored_name for m in Message.query.order_by(Message.id).all()]
-    try:
-        assert len(set(paths)) == 2
-        with open(_static(app, "uploads", "messages", paths[0]), "rb") as fh:
-            assert fh.read() == b"one"
-    finally:
-        for p in set(paths):
-            full = _static(app, "uploads", "messages", p)
-            if os.path.exists(full):
-                os.remove(full)

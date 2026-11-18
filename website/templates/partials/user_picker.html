@@ -1,0 +1,12 @@
+{# Uso: include con `results` y `q`. Destino de htmx (#picker-results). #}
+{% from "partials/user_badge.html" import user_badge %}
+<div id="picker-results" class="list-group">
+    {% for person in results %}
+    <a class="list-group-item list-group-item-action d-flex align-items-center gap-3" href="{{ url_for('messages.conversation', user_id=person.id) }}">
+        <img class="avatar-md" src="{{ url_for('files.avatar', user_id=person.id) }}" alt="">
+        {{ user_badge(person) }}
+    </a>
+    {% else %}
+    {% if q %}<p class="text-secondary p-3 mb-0">No se encontró ninguna persona.</p>{% else %}<p class="text-secondary p-3 mb-0">Escribe un nombre para buscar.</p>{% endif %}
+    {% endfor %}
+</div>

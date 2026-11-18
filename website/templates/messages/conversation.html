@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Mensajes · {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="visually-hidden">Mensajes</h1>
+<div class="row g-3">
+    <div class="col-md-4 d-none d-md-block"><div class="card">{% include "partials/conversation_list.html" %}</div></div>
+    <div class="col-md-8">{% include "partials/message_thread.html" %}</div>
+</div>
+{% endblock %}

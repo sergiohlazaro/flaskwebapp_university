@@ -3,6 +3,8 @@ import secrets
 
 from flask import Flask, Response, redirect, request, url_for
 from flask_compress import Compress
+from flask_login import current_user
+from sqlalchemy import func, select
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import get_config
@@ -76,6 +78,7 @@ def create_app(test_config=None):
     from .blueprints.files import files
     from .blueprints.main import main
     from .blueprints.materials import materials
+    from .blueprints.messages import messages
     from .blueprints.users import users
     from .views import views
 
@@ -85,6 +88,7 @@ def create_app(test_config=None):
     app.register_blueprint(main)
     app.register_blueprint(admin)
     app.register_blueprint(materials)
+    app.register_blueprint(messages)
     app.register_blueprint(users)
 
     # No se crean usuarios por defecto. El primer administrador se crea con:
@@ -106,8 +110,14 @@ def create_app(test_config=None):
 
     @app.context_processor
     def inject_globals():
-        # Task 13 hará real el contador de mensajes sin leer.
-        return {"app_name": app.config["APP_NAME"], "unread_messages_count": 0}
+        from .models import Message
+
+        unread = 0
+        if current_user.is_authenticated:
+            unread = db.session.scalar(
+                select(func.count(Message.id)).where(Message.receiver_id == current_user.id,
+                                                     Message.read_at.is_(None))) or 0
+        return {"app_name": app.config["APP_NAME"], "unread_messages_count": unread}
 
     @login_manager.unauthorized_handler
     def unauthorized():

@@ -1,0 +1,53 @@
+{# Uso: include con `other` (o None), `deleted`, `thread`, `error` y `draft`. Es el destino de htmx (#thread). #}
+{% from "partials/user_badge.html" import user_badge %}
+<section id="thread" class="card thread-card" aria-label="Conversación">
+    <header class="card-header d-flex align-items-center gap-2 bg-white">
+        <a class="btn btn-sm btn-outline-secondary d-md-none" href="{{ url_for('messages.inbox') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</a>
+        {% if deleted %}
+        <strong>Usuario eliminado</strong>
+        {% elif other %}
+        <img class="avatar-sm" src="{{ url_for('files.avatar', user_id=other.id) }}" alt="">
+        <a class="text-decoration-none" href="{{ url_for('users.profile', user_id=other.id) }}">{{ user_badge(other) }}</a>
+        {% endif %}
+    </header>
+    <div class="card-body message-thread" role="log" aria-live="polite">
+        {% for message in thread %}
+        {% set mine = message.sender_id == current_user.id %}
+        <div class="message-row {{ 'message-row-own' if mine else 'message-row-other' }}">
+            <div class="message-bubble {{ 'message-own' if mine else 'message-other' }}">
+                <div class="message-text">{{ message.content }}</div>
+                {% if message.file_stored_name %}
+                <a class="message-attachment d-block mt-1" href="{{ url_for('files.message_file', message_id=message.id) }}">
+                    <i class="bi bi-paperclip" aria-hidden="true"></i> {{ message.file_original_name }}
+                </a>
+                {% endif %}
+                <small class="message-meta d-block">{{ message.created_at|localtime }}</small>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-secondary text-center my-4">Aún no hay mensajes. Escribe el primero.</p>
+        {% endfor %}
+    </div>
+    <footer class="card-footer bg-white">
+        {% if error %}<div class="alert alert-danger py-2" role="alert">{{ error }}</div>{% endif %}
+        {% if deleted %}
+        <p class="text-secondary mb-0">No puedes responder a un usuario eliminado.</p>
+        {% elif other and other.is_blocked %}
+        <p class="text-secondary mb-0">No puedes responder a este usuario.</p>
+        {% elif other %}
+        <form method="post" action="{{ url_for('messages.send', user_id=other.id) }}" enctype="multipart/form-data"
+              hx-post="{{ url_for('messages.send', user_id=other.id) }}" hx-target="#thread" hx-swap="outerHTML" hx-encoding="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="visually-hidden" for="message-content">Mensaje</label>
+            <textarea id="message-content" name="content" class="form-control mb-2" rows="3" maxlength="5000" placeholder="Escribe un mensaje" required>{{ draft }}</textarea>
+            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                <div>
+                    <label class="visually-hidden" for="message-file">Adjuntar archivo</label>
+                    <input type="file" id="message-file" name="file" class="form-control form-control-sm">
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-send" aria-hidden="true"></i> Enviar</button>
+            </div>
+        </form>
+        {% endif %}
+    </footer>
+</section>

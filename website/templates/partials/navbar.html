@@ -20,7 +20,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link position-relative" href="/mensajes">
+                    <a class="nav-link position-relative" href="{{ url_for('messages.inbox') }}">
                         <i class="bi bi-envelope" aria-hidden="true"></i> Mensajes
                         {% if unread_messages_count %}
                         <span class="unread-dot" aria-label="Mensajes sin leer"></span>

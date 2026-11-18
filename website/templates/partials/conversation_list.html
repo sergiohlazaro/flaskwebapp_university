@@ -1,0 +1,27 @@
+{# Uso: include con `conversations`, `active_id`, `deleted` y `excerpt`. #}
+{% from "partials/user_badge.html" import user_badge %}
+<div class="list-group list-group-flush conversation-list">
+    {% for row in conversations %}
+    {% set last = row.last %}
+    {% if row.deleted %}{% set href = url_for('messages.deleted_conversation') %}{% else %}{% set href = url_for('messages.conversation', user_id=row.user.id) %}{% endif %}
+    <a class="list-group-item list-group-item-action d-flex gap-3 align-items-start{% if (row.deleted and deleted) or (not row.deleted and row.user.id == active_id) %} active{% endif %}" href="{{ href }}">
+        {% if row.deleted %}
+        <span class="avatar-md d-inline-flex align-items-center justify-content-center bg-secondary-subtle text-secondary"><i class="bi bi-person-x" aria-hidden="true"></i></span>
+        {% else %}
+        <img class="avatar-md" src="{{ url_for('files.avatar', user_id=row.user.id) }}" alt="">
+        {% endif %}
+        <div class="flex-grow-1 min-w-0">
+            <div class="d-flex justify-content-between gap-2">
+                <strong class="text-truncate">{% if row.deleted %}Usuario eliminado{% else %}{{ user_badge(row.user) }}{% endif %}</strong>
+                <small class="text-nowrap">{{ last.created_at|timeago }}</small>
+            </div>
+            <div class="d-flex justify-content-between gap-2">
+                <span class="text-truncate small">{% if last.sender_id == current_user.id %}Tú: {% endif %}{{ last.content[:excerpt] }}{% if last.content|length > excerpt %}…{% endif %}</span>
+                {% if row.unread %}<span class="badge text-bg-primary rounded-pill" aria-label="{{ row.unread }} sin leer">{{ row.unread }}</span>{% endif %}
+            </div>
+        </div>
+    </a>
+    {% else %}
+    <p class="text-secondary text-center p-4 mb-0">Todavía no tienes conversaciones.</p>
+    {% endfor %}
+</div>
