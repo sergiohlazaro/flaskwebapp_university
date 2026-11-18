@@ -62,7 +62,10 @@
 | SEC-04 | **Corregido** | Los ficheros viven en `instance/uploads/`, fuera de `static/`. Se sirven por `/archivos/...` con sesión; los adjuntos de mensajes solo a emisor y receptor (`can_download_message_file`), los de material ocultos solo a autor y admin. |
 | SEC-06 | **Corregido** | La aplicación no usa caché de vistas (Flask-Caching eliminado). |
 | SEC-07 | **Corregido** | `user_loader` devuelve `None` si el usuario está bloqueado: pierde la sesión en la siguiente petición; las rutas de contenido exigen cuenta activa. |
-| SEC-09 | **Mitigado** | Login con un mensaje genérico único; la mensajería busca por nombre (no por email) y trabaja con ids. El registro sigue indicando que un email ya existe (inherente a un alta abierta). |
+| SEC-09 | **Mitigado** (Fase 5) | Login con un mensaje genérico único; la mensajería busca por nombre (no por email) y trabaja con ids. `/recuperar` y `/verificar/reenviar` dan el mismo código, texto y redirección exista o no la cuenta (`blueprints/auth.py:forgot_password`, `resend_verification`; tests en `test_password_reset.py` y `test_verification.py`). Con `REQUIRE_EMAIL_VERIFICATION` activa, el registro también responde igual (`auth.py:signup`, `_signup_existing`, `SIGNUP_VERIFY_MESSAGE`). **Se cierra al activar SMTP** (`MAIL_BACKEND=smtp`, que activa la verificación por defecto): con el backend `log` y sin verificación, el registro sigue indicando que un email ya existe (inherente a un alta abierta sin verificar el correo). |
+| SEC-10 | **Corregido** (Fase 5) | Límite por IP (`ip:<addr>`, 5 fallos en 600 s, bloqueo de 600 s) y por cuenta (`acct:<email>`, 5 fallos seguidos, bloqueo de 900 s) con contadores en la tabla `AuthThrottle` de la base de datos, no en memoria (`services/throttle.py:login_keys`, `is_locked`, `register_failure`, `reset`; usado en `blueprints/auth.py:login`). Sobreviven a reinicios y se comparten entre procesos; un email inexistente acumula igual que uno existente y el bloqueo muestra siempre el mismo mensaje. Los límites de formularios de Flask-Limiter leen `RATELIMIT_STORAGE_URI` (Redis opcional). La IP real detrás de un proxy sale de `TRUSTED_PROXIES` (`ProxyFix`, `website/__init__.py`). Tests: `tests/test_throttle.py`. |
+| SEC-11 | **Corregido** (Fase 5) | "Recordarme" es una casilla desmarcada por defecto (`forms.py:LoginForm.remember`; `auth.py:login` usa `remember=form.remember.data` y `signup`, `remember=False`). `REMEMBER_COOKIE_DURATION` = 30 días y cookies `HttpOnly`, `SameSite=Lax`, `Secure` en producción (`config.py`). `User.get_id()` devuelve `"<id>:<session_version>"` y el `user_loader` rechaza versiones distintas o ids antiguos (`models.py:User.get_id`, `website/__init__.py`); `services/tokens.py:bump_session_version` se llama al cambiar o restablecer la contraseña, lo que cierra las demás sesiones y cookies "recordarme" (la actual se conserva al cambiarla). Tests: `tests/test_sessions.py`. |
+| SEC-13 | **Corregido** (Fase 5) | El registro general solo contiene ids (el único `logger.info` con datos de usuario usa ids: `blueprints/admin.py:reset_link`) y los emails salientes van a `instance/mail.log`, con rotación diaria y 30 días (`services/mail.py:init_mail`, `MAIL_LOG_RETENTION_DAYS`), nunca al log general. Política de retención aplicada por `flask --app main purge-data` (`commands.py`, `services/retention.py:purge_expired`): `LoginRecord` 90 días, avisos leídos 60, `AuthThrottle` 1 día (los bloqueos vigentes no se purgan, los avisos sin leer tampoco); borrar la cuenta limpia además índice de búsqueda, avisos y contadores. La página de privacidad lista los plazos. Tests: `tests/test_retention.py`, `tests/test_mail.py`. |
 | SEC-12 | **Corregido** | Logout solo por `POST` con token CSRF. |
 | SEC-14 | **Corregido** | CSP sin scripts ni estilos en línea, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, HSTS en producción y SRI en todos los recursos de CDN (test en `test_layout.py`). |
 | SEC-15 | **Corregido** | Cambiar el email o la contraseña exige la contraseña actual y validación de formato (email-validator). |
@@ -86,10 +89,9 @@
 
 **Revisión final (correcciones ya en el código):** páginas de error en español y manejo de `CSRFError`; los reportes de contenido borrado se eliminan (con migración de SQLite `AUTOINCREMENT` para no reutilizar ids); el `next` del login solo acepta URLs que admiten GET; la cookie «recordarme» lleva `HttpOnly`, `SameSite=Lax` y `Secure` en producción; las imágenes subidas tienen un tope de píxeles antes de decodificarse; los administradores pueden ocultar cualquier material o comentario sin reporte previo; borrar materiales, ficheros y comentarios pide confirmación (con JS).
 
-**Pendiente:**
-- **SEC-10:** el límite de intentos de login sigue en memoria por proceso (Flask-Limiter sin almacenamiento compartido).
-- **SEC-11:** el login sigue usando `remember=True` y no hay política de caducidad de sesión (la cookie sí está endurecida: `HttpOnly`, `SameSite`, `Secure` en producción).
-- **SEC-13:** `LoginRecord` guarda la IP sin plazo de retención.
+**Fase 5 (seguridad, recuperación de contraseña, avisos y búsqueda):** SEC-10, SEC-11 y SEC-13 quedan corregidos y SEC-09 mitigado (se cierra al activar SMTP); ver las filas de la tabla anterior. Documentación y uso en el README.
+
+**Pendiente:** ninguno de los hallazgos de seguridad abiertos tras el rediseño, salvo el matiz de SEC-09 (registro sin verificación de email mientras no haya SMTP) y la ausencia de integración continua (QA-14).
 
 ---
 
@@ -130,16 +132,16 @@
 | SEC-06 | Media (latente Crítica) | Alta | E1 | Vistas cacheadas sin clave de usuario; `/admin` cachea tras el control de rol | |
 | SEC-07 | Media | Alta | E2 | Usuarios bloqueados conservan su sesión y casi toda la funcionalidad | |
 | SEC-08 | Alta (antes Media) | Alta | E1 | Dependencias con CVEs conocidos: 98 en 7 paquetes según `pip-audit` | |
-| SEC-09 | Media | Alta | E1 | Enumeración de usuarios (login, registro, mensajes) | |
-| SEC-10 | Media | Alta | E2 | Protección anti fuerza bruta débil y no persistente | |
-| SEC-11 | Media | Alta | E1 | "Recordarme" forzado y cookies de sesión sin caducidad ni endurecimiento | Sí |
+| SEC-09 | Media | Alta | E1 | Enumeración de usuarios (login, registro, mensajes). **Mitigado** (Fase 5; se cierra al activar SMTP) | |
+| SEC-10 | Media | Alta | E2 | Protección anti fuerza bruta débil y no persistente. **Corregido** (Fase 5) | |
+| SEC-11 | Media | Alta | E1 | "Recordarme" forzado y cookies de sesión sin caducidad ni endurecimiento. **Corregido** (Fase 5) | Sí |
 | SEC-14 | Media | Alta | E2 | Sin cabeceras de seguridad (CSP, HSTS, X-Frame-Options) ni SRI en CDN | |
 | SEC-15 | Media | Alta | E1 | Cambio de email sin reautenticación ni validación de formato | |
 | QA-04 | Media | Alta | E1 | Errores 500 por campos ausentes (`None`) en formularios | |
 | QA-12 | Media | Alta | E3 | Configuración no externalizada, seed en la factory, sin migraciones | Sí |
 | QA-14 | Media | Alta | E2 | Cobertura de tests insuficiente; sin linters ni CI | |
 | SEC-12 | Baja | Alta | E1 | Logout por GET (CSRF de logout) | |
-| SEC-13 | Baja | Alta | E2 | Datos personales en logs y registros de IP sin retención | Sí |
+| SEC-13 | Baja | Alta | E2 | Datos personales en logs y registros de IP sin retención. **Corregido** (Fase 5) | Sí |
 | SEC-16 | Baja | Alta | E1 | Validación de ficheros basada en el MIME declarado por el cliente | |
 | SEC-17 | Baja | Alta | E2 | Emails de todos los usuarios expuestos en URLs y listados | Sí |
 | SEC-18 | Baja | Alta | E1 | El admin puede borrar su cuenta y se recrea `admin/admin` al reiniciar | |
@@ -204,11 +206,13 @@
 - **Evidencia:** `website/auth.py:66` ("Email does not exist") frente a `website/auth.py:93` ("Incorrect password"); `website/auth.py:120-121` ("Email already exists"); `website/views.py:485-488` ("User with this email does not exist!"); `website/auth.py:71-72` revela cuentas bloqueadas.
 - **Impacto:** permite confirmar qué emails están registrados, facilitando fuerza bruta y phishing dirigido. OWASP A07.
 - **Propuesta:** mensaje genérico "Email o contraseña incorrectos" en login (incluido el caso bloqueado, que además debe contar como intento fallido); en registro, mensaje neutro o flujo de verificación por email; en mensajería, mensaje neutro.
+- **Estado (Fase 5): mitigado; se cierra al activar SMTP.** Ver la sección 0b.
 
 #### SEC-11: Sesiones: "recordarme" forzado y sin caducidad · Media · Confianza alta · Requiere diseño
 - **Evidencia:** `website/auth.py:80` y `website/auth.py:149` `login_user(user, remember=True)` siempre; `website/__init__.py:49-52` endurece la cookie de sesión pero no `REMEMBER_COOKIE_SECURE/HTTPONLY/SAMESITE`, ni `PERMANENT_SESSION_LIFETIME`, ni `REMEMBER_COOKIE_DURATION` (365 días por defecto); `session_protection` por defecto ("basic").
 - **Impacto:** una cookie robada da acceso durante un año; en equipos compartidos (aulas universitarias) la sesión persiste tras cerrar el navegador. Tras cambiar la contraseña no se invalidan otras sesiones.
 - **Propuesta:** casilla "Recordarme" opcional; configurar las cookies `REMEMBER_*`; duración razonable; `session_protection = "strong"`; invalidar sesiones al cambiar la contraseña (p. ej. `get_id` basado en un token rotado). La política concreta (duraciones) es una decisión de diseño.
+- **Estado (Fase 5): corregido** (casilla opcional, cookie de 30 días, `session_version` que invalida otras sesiones). Ver la sección 0b.
 
 #### SEC-12: Logout por GET · Baja · Confianza alta
 - **Evidencia:** `website/auth.py:165-172` (`/logout` acepta GET).
@@ -307,6 +311,7 @@
 - **Evidencia:** `website/auth.py:27-31` diccionario `FAILED_LOGINS` en memoria del proceso, sin límite de tamaño ni limpieza; `website/__init__.py:23` `Limiter` sin `storage_uri` (memoria); `request.remote_addr` (`website/auth.py:41`) detrás de un proxy es la IP del proxy; los intentos contra cuentas bloqueadas no cuentan; el límite es solo por IP (no por cuenta).
 - **Impacto:** con varios workers o reinicios los contadores se pierden; tras un proxy inverso todos los usuarios comparten IP (bloqueo masivo); atacante distribuido no es frenado; crecimiento de memoria.
 - **Propuesta:** almacenamiento compartido (Redis) para Flask-Limiter y para los contadores; límite combinado IP + cuenta; `ProxyFix` si hay proxy; eliminar el diccionario casero en favor del limitador.
+- **Estado (Fase 5): corregido** con contadores persistentes por IP y por cuenta en la base de datos. Ver la sección 0b.
 
 #### SEC-14: Sin cabeceras de seguridad ni SRI · Media · Confianza alta
 - **Evidencia:** no hay `after_request` ni extensión (Flask-Talisman) que añada CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`; `website/templates/base.html:12,15,17,121-122` cargan CSS/JS de jsDelivr sin `integrity`/`crossorigin`; `base.html:24,27-31` usan JS inline (impide una CSP estricta).
@@ -317,6 +322,7 @@
 - **Evidencia:** `website/views.py:125` (email nuevo), `website/views.py:380,383,386,518` (emails de remitente y destinatario) en `app.log`; `LoginRecord` guarda IPs sin límite temporal (`website/models.py:84-95`).
 - **Impacto:** el sitio declara cumplimiento legal (páginas de privacidad/cookies) pero conserva datos personales indefinidamente y en texto plano en un log.
 - **Propuesta:** registrar IDs en lugar de emails; definir y aplicar una política de retención para `LoginRecord` y logs (decisión de diseño/legal).
+- **Estado (Fase 5): corregido** (ids en el log, `purge-data` con plazos de 90/60/1 días y rotación de 30 días del log de correo). Ver la sección 0b.
 
 #### SEC-17: Emails expuestos · Baja · Confianza alta · Requiere diseño
 - **Evidencia:** `website/views.py:394` (`/viewuser/<email>`), `website/templates/userlist.html:33`; la mensajería pide el email del destinatario.
