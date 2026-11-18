@@ -39,7 +39,6 @@ def test_templates_have_no_inline_styles_or_scripts():
     root = os.path.join(os.path.dirname(__file__), "..", "website", "templates")
     offenders = []
     for folder, dirs, names in os.walk(root):
-        dirs[:] = [d for d in dirs if d != "legacy"]
         for name in names:
             with open(os.path.join(folder, name), encoding="utf-8") as fh:
                 text = fh.read()

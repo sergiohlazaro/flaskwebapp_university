@@ -63,8 +63,6 @@ def avatar(user_id):
     if user is None:
         abort(404)
     if not user.avatar:
-        # Provisional: el avatar por defecto sigue en static/profile_pics/default.jpg
-        # hasta la Tarea 14, que lo mueve a static/img/default-avatar.jpg y actualiza esto.
-        return redirect(url_for("static", filename="profile_pics/default.jpg"))
+        return redirect(url_for("static", filename="img/default-avatar.jpg"))
     mime = mimetypes.guess_type(user.avatar)[0] or "image/jpeg"
     return _send("avatars", user.avatar, user.avatar, mime)

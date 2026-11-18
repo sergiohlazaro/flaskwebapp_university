@@ -193,7 +193,7 @@ def test_avatar_fake_image_rejected(app, client):
 
 
 def test_avatar_named_default_cannot_overwrite_shared_default(app, client):  # sustituye SEC-05
-    default_path = os.path.join(app.root_path, "static", "profile_pics", "default.jpg")
+    default_path = os.path.join(app.root_path, "static", "img", "default-avatar.jpg")
     with open(default_path, "rb") as fh:
         original = fh.read()
     user = make_user("evil@example.com")

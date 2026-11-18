@@ -19,7 +19,6 @@ from ..models import (
     LoginRecord,
     Material,
     Message,
-    Publication,
     Rating,
     Report,
     ReportTarget,
@@ -212,7 +211,6 @@ def _delete_user_data(user):
         db.session.delete(material)  # cascada: ficheros, valoraciones, favoritos y comentarios
     db.session.flush()
     db.session.execute(delete(LoginRecord).where(LoginRecord.user_id == uid))
-    db.session.execute(delete(Publication).where(Publication.user_id == uid))
 
     db.session.execute(update(Message).where(Message.sender_id == uid).values(sender_id=None))
     db.session.execute(update(Message).where(Message.receiver_id == uid).values(receiver_id=None))

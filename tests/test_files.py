@@ -157,7 +157,7 @@ def test_avatar_requires_login_and_redirects_default(app, client):
     login(client, "a@x.com")
     r = client.get(f"/avatar/{u.id}")
     assert r.status_code == 302
-    assert r.headers["Location"].endswith("profile_pics/default.jpg")
+    assert r.headers["Location"].endswith("img/default-avatar.jpg")
     assert client.get("/avatar/999").status_code == 404
 
 

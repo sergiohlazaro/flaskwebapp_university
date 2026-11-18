@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from flask_login import UserMixin
 from sqlalchemy import CheckConstraint
 from sqlalchemy.orm import validates
-from sqlalchemy.sql import func as sql_func
 
 from .extensions import db
 
@@ -73,7 +72,6 @@ class User(UserMixin, db.Model):
     linkedin = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
 
-    publications = db.relationship('Publication')
     login_records = db.relationship('LoginRecord')
 
     @property
@@ -183,15 +181,6 @@ class Report(db.Model):
 
     reporter = db.relationship("User", foreign_keys=[reporter_id])
     resolved_by = db.relationship("User", foreign_keys=[resolved_by_id])
-
-
-# Se conserva hasta la Tarea 14 (la app antigua todavía lo usa).
-class Publication(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.Text, nullable=False)
-    date = db.Column(db.DateTime(timezone=True), default=sql_func.now())
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    file_path = db.Column(db.String(255), nullable=True)
 
 
 class LoginRecord(db.Model):

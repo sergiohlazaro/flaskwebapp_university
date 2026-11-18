@@ -18,6 +18,7 @@ def test_qa02_create_app_uses_config_passed_before_init(tmp_path):
 
     with app.app_context():
         assert db.engine.url.database == str(db_file)
+        db.create_all()
         assert User.query.count() == 0  # sin usuarios sembrados en modo test
 
 
@@ -80,6 +81,7 @@ def test_sec03_app_start_does_not_seed_default_accounts(tmp_path):
     app = create_app({"SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'prod.db'}"})
 
     with app.app_context():
+        db.create_all()
         assert User.query.count() == 0
 
 

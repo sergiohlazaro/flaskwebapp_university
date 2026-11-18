@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import get_config
-from .extensions import csrf, db, limiter, login_manager
+from .extensions import csrf, db, limiter, login_manager, migrate
 
 __all__ = ["create_app", "db"]
 
@@ -51,6 +51,8 @@ def create_app(test_config=None):
     csrf.init_app(app)
     limiter.init_app(app)
     db.init_app(app)
+    # Las tablas se crean con `flask --app main db upgrade` (render_as_batch: ALTER en SQLite).
+    migrate.init_app(app, db, render_as_batch=True)
 
     login_manager.login_view = "auth.login"
     login_manager.init_app(app)
@@ -80,9 +82,7 @@ def create_app(test_config=None):
     from .blueprints.materials import materials
     from .blueprints.messages import messages
     from .blueprints.users import users
-    from .views import views
 
-    app.register_blueprint(views, url_prefix="/")
     app.register_blueprint(auth, url_prefix="/")
     app.register_blueprint(files)
     app.register_blueprint(main)
@@ -94,9 +94,6 @@ def create_app(test_config=None):
     # No se crean usuarios por defecto. El primer administrador se crea con:
     #   flask --app main create-admin
     from .commands import create_admin_command
-
-    with app.app_context():
-        db.create_all()
 
     app.cli.add_command(create_admin_command)
 
