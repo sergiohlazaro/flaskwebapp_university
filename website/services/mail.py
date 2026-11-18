@@ -55,12 +55,12 @@ def sent_emails() -> list[dict]:
 
 def _send_smtp(to, subject, body):
     cfg = current_app.config
-    msg = EmailMessage()
-    msg["From"] = cfg["MAIL_DEFAULT_SENDER"]
-    msg["To"] = to
-    msg["Subject"] = subject
-    msg.set_content(body)
     try:
+        msg = EmailMessage()
+        msg["From"] = cfg["MAIL_DEFAULT_SENDER"]
+        msg["To"] = to  # CR/LF en cabeceras lanza ValueError
+        msg["Subject"] = subject
+        msg.set_content(body)
         with smtplib.SMTP(cfg["MAIL_SERVER"], cfg["MAIL_PORT"], timeout=10) as smtp:
             if cfg["MAIL_USE_TLS"]:
                 smtp.starttls()
@@ -68,5 +68,5 @@ def _send_smtp(to, subject, body):
                 smtp.login(cfg["MAIL_USERNAME"], cfg["MAIL_PASSWORD"])
             smtp.send_message(msg)
     except Exception as exc:  # noqa: BLE001 - un fallo de correo no debe romper la petición
-        # Sin cuerpo ni destinatario: el log general no recibe datos del mensaje.
-        current_app.logger.error("No se pudo enviar el email (%s): %s", type(exc).__name__, exc)
+        # Solo el tipo: str(exc) puede incluir destinatarios u otros datos del mensaje.
+        current_app.logger.error("No se pudo enviar el email (%s)", type(exc).__name__)

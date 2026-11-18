@@ -55,3 +55,12 @@ def test_verify_token_roundtrip_carries_email(app):
 @pytest.mark.parametrize("salt,age", [("password-reset", 3600), ("email-verify", 172800)])
 def test_max_ages(salt, age):
     assert tokens.MAX_AGE[salt] == age
+
+
+def test_reset_payload_does_not_leak_password_material(app):
+    user = make_user("a@example.com")
+    token = make_reset_token(user)
+    ser = URLSafeTimedSerializer("test-secret-key", salt="password-reset")
+    payload = ser.loads_unsafe(token)[1]
+    assert user.password[-8:] not in str(payload)
+    assert load_reset_token(token) == user

@@ -1,4 +1,7 @@
 """Tokens firmados de recuperación de contraseña y verificación de email."""
+import hashlib
+import hmac
+
 from flask import current_app
 from itsdangerous import BadData, URLSafeTimedSerializer
 
@@ -24,7 +27,10 @@ def _load(token, salt):
 
 def _fingerprint(user):
     # Cambia con la contraseña (y con session_version): hace el token de un solo uso.
-    return f"{getattr(user, 'session_version', 0)}:{user.password[-8:]}"
+    # HMAC para no dejar material del hash en el payload, legible aunque esté firmado.
+    msg = f"{getattr(user, 'session_version', 0)}:{user.password or ''}".encode()
+    key = current_app.config["SECRET_KEY"].encode()
+    return hmac.new(key, msg, hashlib.sha256).hexdigest()[:16]
 
 
 def make_reset_token(user) -> str:
@@ -36,7 +42,8 @@ def load_reset_token(token):
     if data is None or not isinstance(data.get("id"), int):
         return None
     user = db.session.get(User, data["id"])
-    if user is None or data.get("fp") != _fingerprint(user):
+    if (user is None or not isinstance(data.get("fp"), str)
+            or not hmac.compare_digest(data["fp"], _fingerprint(user))):
         return None
     return user
 
@@ -46,6 +53,8 @@ def make_verify_token(user, email) -> str:
 
 
 def load_verify_token(token):
+    """Devuelve `(usuario, email)` o None. No es de un solo uso: quien llama debe comparar
+    el email devuelto con el email pendiente/actual del usuario antes de aplicarlo."""
     data = _load(token, VERIFY_SALT)
     if data is None or not isinstance(data.get("id"), int) or not isinstance(data.get("email"), str):
         return None

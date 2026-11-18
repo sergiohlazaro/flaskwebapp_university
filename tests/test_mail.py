@@ -62,14 +62,24 @@ def test_smtp_backend_failure_does_not_raise(tmp_path, monkeypatch, caplog):
     app = _mail_app(tmp_path, MAIL_BACKEND="smtp", MAIL_SERVER="smtp.invalid")
 
     def boom(*args, **kwargs):
-        raise OSError("no connection")
+        raise OSError("no connection to ana@example.com")
 
     monkeypatch.setattr(smtplib, "SMTP", boom)
     with app.app_context(), caplog.at_level(logging.DEBUG):
         send_email("ana@example.com", "Hola", "email/password_reset.txt", name="Ana",
                    link="http://x/SECRETLINK")
     assert "SECRETLINK" not in caplog.text
-    assert "no connection" in caplog.text
+    assert "OSError" in caplog.text
+    assert "ana@example.com" not in caplog.text
+
+
+def test_smtp_header_injection_does_not_raise(tmp_path, monkeypatch, caplog):
+    app = _mail_app(tmp_path, MAIL_BACKEND="smtp", MAIL_SERVER="smtp.invalid")
+    monkeypatch.setattr(smtplib, "SMTP", lambda *a, **k: pytest.fail("must not connect"))
+    with app.app_context(), caplog.at_level(logging.DEBUG):
+        send_email("a@b.com\r\nBcc: x@y.com", "Hola", "email/password_reset.txt", name="A",
+                   link="http://x/SECRETLINK")
+    assert "SECRETLINK" not in caplog.text
 
 
 def test_smtp_backend_sends_message(tmp_path, monkeypatch):
