@@ -8,14 +8,6 @@ from website.models import LoginRecord, User
 GENERIC = "Email o contraseña incorrectos."
 
 
-@pytest.fixture(autouse=True)
-def reset_failed_logins():
-    from website.blueprints import auth as auth_module
-    auth_module.FAILED_LOGINS.clear()
-    yield
-    auth_module.FAILED_LOGINS.clear()
-
-
 def _signup(client, **overrides):
     data = {"name": "Ana", "surname": "Pérez", "email": "ana@uni.es",
             "password": PASSWORD, "password2": PASSWORD}
@@ -33,7 +25,7 @@ def test_login_error_message_is_generic(app, client):
 
 
 def test_blocked_user_gets_generic_message_and_counts_attempt(app, client):
-    from website.blueprints import auth as auth_module
+    from website.models import AuthThrottle
     user = make_user("blocked@uni.es")
     user.is_blocked = True
     db.session.commit()
@@ -41,7 +33,7 @@ def test_blocked_user_gets_generic_message_and_counts_attempt(app, client):
     response = client.post("/login", data={"email": "blocked@uni.es", "password": PASSWORD})
 
     assert GENERIC in response.get_data(as_text=True)
-    assert auth_module.FAILED_LOGINS["127.0.0.1"][0] == 1
+    assert db.session.get(AuthThrottle, "ip:127.0.0.1").failures == 1
     assert client.get("/explorar").status_code == 302  # sin sesión
 
 
@@ -141,7 +133,7 @@ def test_ip_lockout_after_five_failed_attempts(app, client):
 
     response = client.post("/login", data={"email": "lock@uni.es", "password": PASSWORD})
 
-    assert "Demasiados intentos fallidos" in response.get_data(as_text=True)
+    assert "Demasiados intentos. Inténtalo de nuevo en unos minutos." in response.get_data(as_text=True)
     assert client.get("/explorar").status_code == 302  # ni con la contraseña correcta
 
 

@@ -1,6 +1,5 @@
 """Autenticación: login, registro y logout."""
 
-import time
 from urllib.parse import urlsplit
 
 from flask import (
@@ -19,6 +18,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from ..extensions import db, limiter
 from ..forms import ForgotPasswordForm, LoginForm, ResetPasswordForm, SignupForm
 from ..models import LoginRecord, User, utcnow
+from ..services import throttle
 from ..services.mail import send_email
 from ..services.tokens import (
     bump_session_version,
@@ -31,13 +31,6 @@ from ..services.tokens import (
 # Creación de un Blueprint llamado 'auth' para agrupar todas las rutas relacionadas con autenticación
 auth = Blueprint('auth', __name__)
 
-# Estructura para almacenar intentos fallidos → en memoria por IP
-FAILED_LOGINS = {}
-
-# Configuración del bloqueo temporal
-MAX_FAILED_ATTEMPTS = 5
-BLOCK_TIME_SECONDS = 600  # 10 minutos bloqueado tras superar el límite
-
 # Cuentas que versiones anteriores creaban automáticamente con contraseñas públicas.
 LEGACY_DEFAULT_CREDENTIALS = {
     'admin@admin.com': 'admin',
@@ -49,11 +42,8 @@ LEGACY_DEFAULT_CREDENTIALS = {
 # -----------------------
 
 GENERIC_LOGIN_ERROR = "Email o contraseña incorrectos."
+LOCKED_MESSAGE = "Demasiados intentos. Inténtalo de nuevo en unos minutos."
 UNACTIVATED_MESSAGE = "Tu cuenta aún no está activada. Revisa tu email o pide un nuevo enlace."
-
-
-def _register_failure(ip_address):
-    FAILED_LOGINS[ip_address] = [FAILED_LOGINS.get(ip_address, [0, 0])[0] + 1, time.time()]
 
 
 def _safe_next(target):
@@ -73,20 +63,15 @@ def login():
     ip_address = request.remote_addr
     form = LoginForm()
 
-    # Verificar si la IP está bloqueada
-    block_info = FAILED_LOGINS.get(ip_address)
-    if block_info:
-        failed_attempts, last_attempt_time = block_info
-        if failed_attempts >= MAX_FAILED_ATTEMPTS:
-            if time.time() - last_attempt_time < BLOCK_TIME_SECONDS:
-                flash("Demasiados intentos fallidos. Inténtalo de nuevo más tarde.", category='error')
-                return render_template("auth/login.html", form=form)
-            # Pasó el tiempo de bloqueo: resetear intentos
-            FAILED_LOGINS[ip_address] = [0, 0]
-
     if form.validate_on_submit():
         email = form.email.data
         password = form.password.data
+        keys = throttle.login_keys(ip_address, email)
+        # El bloqueo se comprueba antes de mirar la contraseña y da el mismo mensaje
+        # exista o no la cuenta, también con la contraseña correcta (sin enumeración).
+        if throttle.is_locked(keys):
+            flash(LOCKED_MESSAGE, category='error')
+            return render_template("auth/login.html", form=form)
         user = User.query.filter_by(email=email).first()
 
         # Credenciales por defecto publicadas por versiones anteriores (SEC-03):
@@ -94,11 +79,13 @@ def login():
         if LEGACY_DEFAULT_CREDENTIALS.get(email) == password:
             flash('Las credenciales por defecto están desactivadas. Pide a un administrador '
                   'que cree una cuenta nueva (flask create-admin).', category='error')
-            _register_failure(ip_address)
-        # Email inexistente, contraseña errónea o cuenta bloqueada: mismo mensaje (SEC-09)
+            throttle.register_failure(keys)
+        # Email inexistente, contraseña errónea o cuenta bloqueada: mismo mensaje (SEC-09) y todos
+        # cuentan como fallo. La cuenta sin verificar con contraseña correcta no cuenta (la
+        # contraseña es válida) ni resetea las claves.
         elif not user or user.is_blocked or not check_password_hash(user.password, password):
             flash(GENERIC_LOGIN_ERROR, category='error')
-            _register_failure(ip_address)
+            throttle.register_failure(keys)
         elif current_app.config["REQUIRE_EMAIL_VERIFICATION"] and user.email_verified_at is None:
             # Solo se revela tras acertar la contraseña (sin enumeración de cuentas).
             flash(UNACTIVATED_MESSAGE, category='error')
@@ -107,7 +94,7 @@ def login():
             login_user(user, remember=form.remember.data)
             db.session.add(LoginRecord(user_id=user.id, ip_address=ip_address))
             db.session.commit()
-            FAILED_LOGINS[ip_address] = [0, 0]
+            throttle.reset(keys)
             flash('Sesión iniciada correctamente.', category='success')
             return redirect(_safe_next(request.args.get('next')))
 

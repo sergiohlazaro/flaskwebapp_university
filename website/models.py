@@ -216,3 +216,13 @@ class Message(db.Model):
 
     sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
     receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
+
+
+class AuthThrottle(db.Model):
+    """Fallos de login por clave (`ip:<addr>` o `acct:<email>`); ver services/throttle.py."""
+    __tablename__ = "auth_throttle"
+    key = db.Column(db.String(320), primary_key=True)
+    failures = db.Column(db.Integer, nullable=False, default=0)
+    first_failure_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    locked_until = db.Column(db.DateTime(timezone=True), nullable=True)
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
