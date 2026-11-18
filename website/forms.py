@@ -33,6 +33,21 @@ class LoginForm(FlaskForm):
     remember = BooleanField("Recordarme", default=False)
 
 
+class ForgotPasswordForm(FlaskForm):
+    email = StringField("Email", filters=[_strip_lower], validators=[DataRequired(REQUIRED)])
+
+
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField("Nueva contraseña", validators=[
+        DataRequired(REQUIRED),
+        Length(min=8, message="La contraseña debe tener al menos 8 caracteres."),
+    ])
+    password2 = PasswordField("Repite la nueva contraseña", validators=[
+        DataRequired(REQUIRED),
+        EqualTo("password", message="Las contraseñas no coinciden."),
+    ])
+
+
 class SignupForm(FlaskForm):
     name = StringField("Nombre", filters=[_strip], validators=[
         DataRequired(REQUIRED),

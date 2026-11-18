@@ -1,6 +1,15 @@
 """Panel de administración: usuarios, asignaturas, reportes y contenido oculto (spec §5.2, §5.6, §5.9)."""
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -22,6 +31,7 @@ from ..models import (
 from ..services.permissions import admin_required
 from ..services.query import escape_like, page_param
 from ..services.reports import resolve_pending_reports
+from ..services.tokens import make_reset_token
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -122,6 +132,20 @@ def toggle_teacher(user_id):
     db.session.commit()
     flash("Marcado como profesor/a." if user.is_teacher else "Ya no figura como profesor/a.", "success")
     return redirect(url_for("admin.users"))
+
+
+@admin.route("/usuarios/<int:user_id>/enlace-recuperacion", methods=["POST"])
+@login_required
+@admin_required
+def reset_link(user_id):
+    user = _user_or_404(user_id)
+    if user.is_admin:
+        flash("No se puede generar un enlace de recuperación para otro administrador.", "error")
+        return users(), 400
+    link = url_for("auth.reset_password", token=make_reset_token(user), _external=True)
+    # Sin el token en el log general.
+    current_app.logger.info(f"admin {current_user.id} generó un enlace de recuperación para el usuario {user.id}")
+    return render_template("admin/reset_link.html", target=user, link=link, active_tab="users")
 
 
 @admin.route("/usuarios/<int:user_id>/accesos")

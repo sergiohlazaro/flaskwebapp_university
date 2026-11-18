@@ -31,6 +31,12 @@
                 <div class="d-flex gap-2 justify-content-end">
                     <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.user_logins', user_id=user.id) }}">Accesos</a>
                     {% if user.id != current_user.id %}
+                    {% if not user.is_admin %}
+                    <form method="post" action="{{ url_for('admin.reset_link', user_id=user.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">Generar enlace de recuperación</button>
+                    </form>
+                    {% endif %}
                     {% if user.is_blocked %}
                     <form method="post" action="{{ url_for('admin.unblock', user_id=user.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

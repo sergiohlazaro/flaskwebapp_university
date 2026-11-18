@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Enlace no válido · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card"><div class="card-body p-4 text-center">
+            <h1 class="h4 mb-3">El enlace no es válido o ha caducado.</h1>
+            <p class="text-secondary">Puedes pedir uno nuevo.</p>
+            <a class="btn btn-primary" href="{{ url_for('auth.forgot_password') }}">Recuperar contraseña</a>
+        </div></div>
+    </div>
+</div>
+{% endblock %}

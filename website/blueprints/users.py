@@ -198,8 +198,7 @@ def update_password():
             form.current_password.errors = [WRONG_PASSWORD]
         else:
             current_user.password = generate_password_hash(form.new_password.data)
-            db.session.commit()
-            bump_session_version(current_user)
+            bump_session_version(current_user)  # un único commit: hash y versión juntos
             # El cliente actual sigue dentro con el id nuevo; conserva su "Recordarme" si lo usaba
             # (la cookie remember solo existe en el navegador si se marcó al iniciar sesión).
             remembered = current_app.config.get("REMEMBER_COOKIE_NAME", REMEMBER_COOKIE_NAME) in request.cookies
