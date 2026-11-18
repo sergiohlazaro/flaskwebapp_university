@@ -309,7 +309,7 @@ Tras la auditoría de [`docs/audit/AUDIT.md`](docs/audit/AUDIT.md) y el rediseñ
 - Borra por política los datos personales caducados (IP de los accesos a los 90 días, avisos leídos, intentos) con `purge-data` y el log solo guarda ids, nunca emails (SEC-13).
 - Usa versiones de dependencias sin vulnerabilidades conocidas (`pip-audit`).
 
-**Mitigado** (ver la auditoría): SEC-09 queda cerrado al activar el envío real de emails (`MAIL_BACKEND=smtp`, que activa la verificación de email: registro y cambio de email responden igual exista o no la dirección); con la verificación desactivada (por ejemplo con el backend `log`) el registro y el cambio de email siguen indicando que un email ya existe, por diseño.
+**Mitigado** (ver la auditoría): SEC-09 queda cerrado al activar el envío real de emails (`MAIL_BACKEND=smtp`, que activa la verificación de email: el registro, la recuperación, el reenvío y el cambio de email no responden distinto ni tardan notablemente distinto exista o no la dirección: el alta calcula siempre un hash y el cambio de email muestra la dirección pedida como pendiente en ambos casos); con la verificación desactivada (por ejemplo con el backend `log`) el registro y el cambio de email siguen indicando que un email ya existe, por diseño.
 
 Si encuentras un fallo de seguridad, comunícalo en privado al autor del repositorio en lugar de abrir un issue público.
 

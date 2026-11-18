@@ -115,8 +115,10 @@ def _send_verification(user, email):
     send_email(email, "Confirma tu email", "email/email_verify.txt", name=user.name, link=link)
 
 
-def _signup_existing(email):
+def _signup_existing(email, password):
     # Misma respuesta que un registro nuevo; el aviso va solo al dueño del email.
+    # Hash descartado: iguala el coste con el alta nueva (que hashea) para no delatar el email por tiempos.
+    generate_password_hash(password, method='pbkdf2:sha256')
     owner = User.query.filter_by(email=email).first()
     if owner is not None and owner.email_verified_at is None:
         _send_verification(owner, owner.email)  # cuenta pendiente: se reenvía el enlace de activación
@@ -135,7 +137,7 @@ def signup():
     if form.validate_on_submit():
         verify = current_app.config["REQUIRE_EMAIL_VERIFICATION"]
         if verify and User.query.filter_by(email=form.email.data).first():
-            return _signup_existing(form.email.data)
+            return _signup_existing(form.email.data, form.password.data)
         # Solo se leen los campos del formulario: role/is_teacher del POST se ignoran.
         new_user = User(
             name=form.name.data,
@@ -152,7 +154,7 @@ def signup():
             # Carrera: otro registro con el mismo email se coló tras la comprobación del formulario.
             db.session.rollback()
             if verify:
-                return _signup_existing(form.email.data)
+                return _signup_existing(form.email.data, form.password.data)
             form.email.errors = list(form.email.errors) + ["Ya existe una cuenta con ese email."]
             return render_template("auth/signup.html", form=form)
 

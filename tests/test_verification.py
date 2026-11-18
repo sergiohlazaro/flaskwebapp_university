@@ -317,3 +317,18 @@ def test_migration_marks_existing_users_verified(tmp_path):
     assert {"email_verified_at", "pending_email"} <= columns
     assert row.email_verified_at is not None and row.email_verified_at == row.created_at
     assert row.pending_email is None
+
+
+@pytest.mark.parametrize("case", ["new", "existing_verified", "existing_unverified"])
+def test_signup_hashes_password_once_in_every_path(app_verify, vclient, monkeypatch, case):
+    # Tiempos similares: el camino de cuenta existente hace el mismo trabajo de hash que el de alta nueva.
+    from website.blueprints import auth as auth_module
+    if case != "new":
+        make_user("taken@uni.es", verified=(case == "existing_verified"))
+    calls = []
+    real = auth_module.generate_password_hash
+    monkeypatch.setattr(auth_module, "generate_password_hash",
+                        lambda *a, **kw: calls.append(a) or real(*a, **kw))
+    response = _signup(vclient, "new@uni.es" if case == "new" else "taken@uni.es")
+    assert response.status_code == 302
+    assert len(calls) == 1 and calls[0][0] == PASSWORD
