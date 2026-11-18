@@ -52,6 +52,45 @@
 
 ---
 
+## 0b. Estado tras el rediseño (Fase 4)
+
+- **Rama:** `feature/redesign`. **Sin merge.** El rediseño (biblioteca de material, ver `docs/superpowers/specs/`) sustituyó la aplicación auditada, por lo que muchos hallazgos desaparecen con el código que los contenía.
+- **Verificación:** suite completa en verde con cobertura del 97 % de `website/`, `ruff check .` sin avisos y `pip-audit -r requirements.txt` sin vulnerabilidades conocidas. Cada fila se ha comprobado contra el código actual.
+
+| ID | Estado | Cómo queda |
+|---|---|---|
+| SEC-04 | **Corregido** | Los ficheros viven en `instance/uploads/`, fuera de `static/`. Se sirven por `/archivos/...` con sesión; los adjuntos de mensajes solo a emisor y receptor (`can_download_message_file`), los de material ocultos solo a autor y admin. |
+| SEC-06 | **Corregido** | La aplicación no usa caché de vistas (Flask-Caching eliminado). |
+| SEC-07 | **Corregido** | `user_loader` devuelve `None` si el usuario está bloqueado: pierde la sesión en la siguiente petición; las rutas de contenido exigen cuenta activa. |
+| SEC-09 | **Mitigado** | Login con un mensaje genérico único; la mensajería busca por nombre (no por email) y trabaja con ids. El registro sigue indicando que un email ya existe (inherente a un alta abierta). |
+| SEC-12 | **Corregido** | Logout solo por `POST` con token CSRF. |
+| SEC-14 | **Corregido** | CSP sin scripts ni estilos en línea, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, HSTS en producción y SRI en todos los recursos de CDN (test en `test_layout.py`). |
+| SEC-15 | **Corregido** | Cambiar el email o la contraseña exige la contraseña actual y validación de formato (email-validator). |
+| SEC-16 | **Corregido** | `services/uploads.py` valida el contenido real (firma/Pillow) además de la extensión; los documentos se descargan como adjunto con `nosniff`. |
+| SEC-17 | **Corregido** | Perfiles y mensajes por id (`/u/<id>`, `/mensajes/<id>`); el email no aparece en URLs ni en los listados. |
+| SEC-18 | **Corregido** | No se recrea ningún admin al arrancar y no se puede borrar la cuenta del último administrador activo. |
+| QA-04 | **Corregido** | Formularios WTForms con validación; campos ausentes o malformados dan errores de formulario, no 500 (tests de parámetros malformados del feed y de ficheros falsos). |
+| QA-05 | **Corregido** | Registro y demás acciones usan POST-redirect-GET. |
+| QA-06 | **Corregido** | Se elimina `bleach`: se guarda texto plano y Jinja escapa una sola vez. |
+| QA-07 | **Corregido** | Los perfiles y listados son rutas nuevas con paginación propia. |
+| QA-08 | **Corregido** | Borrar material, mensajes o cuentas elimina también los ficheros del disco. |
+| QA-09 | **Corregido** | Eliminados `views.py` antiguo, `Publication`, plantillas heredadas, `logo.jpg` y las imágenes/estáticos sin uso; `ruff check .` limpio. |
+| QA-10 | **Corregido** | Una sola implementación de subida y validación (`services/uploads.py`). |
+| QA-11 | **Corregido** | `requirements.txt` solo con dependencias de ejecución; `pytest`, `pytest-cov`, `ruff` y `pip-audit` en `requirements-dev.txt`. Nota: `rich`, `markdown-it-py`, `mdurl` y `Pygments` se mantienen porque son dependencias de Flask-Limiter. |
+| QA-12 | **Corregido** | Configuración por entorno (`APP_ENV`, `SECRET_KEY`, `APP_NAME`, `TRUSTED_PROXIES`), sin seed ni `create_all` en la factory y esquema versionado con Flask-Migrate (`migrations/`). |
+| QA-13 | **Corregido** | Una sola plantilla base con Bootstrap 5, htmx y Bootstrap Icons con SRI; CSS y JS propios en `static/`. |
+| QA-14 | **Mejorado** | Cobertura del 97 % y `ruff`; sigue sin haber integración continua. |
+| QA-15 | **Corregido** | `SESSION_COOKIE_SECURE` depende del entorno (`True` solo en producción). |
+| QA-16 | **Corregido** | Fechas guardadas en UTC con zona y mostradas en `Europe/Madrid` mediante el filtro `localtime`. |
+| QA-17 | **Corregido** | Ficheros subidos bajo `app.instance_path`/`UPLOAD_ROOT`, no relativos al directorio de trabajo. |
+
+**Pendiente:**
+- **SEC-10:** el límite de intentos de login sigue en memoria por proceso (Flask-Limiter sin almacenamiento compartido).
+- **SEC-11:** el login sigue usando `remember=True` y no hay política de caducidad de sesión.
+- **SEC-13:** `LoginRecord` guarda la IP sin plazo de retención.
+
+---
+
 ## 1. Stack, estructura y ejecución
 
 | Aspecto | Detalle |

@@ -1,10 +1,8 @@
-# FlaskWebApp University
+# Campus Share
 
-Plataforma web para que **estudiantes y profesores compartan material didáctico** (apuntes, ejercicios, exámenes, resúmenes) y se comuniquen entre ellos, con administradores que gestionan la plataforma.
+Biblioteca colaborativa de **material didáctico** para estudiantes y profesores: se sube material (apuntes, ejercicios, exámenes, resúmenes), se encuentra en un feed con filtros y se valora, comenta, guarda o reporta. Incluye mensajería privada y un panel de administración.
 
-Nació como Trabajo de Fin de Grado en Ingeniería Informática (Universidad Politécnica de Madrid) y ahora es un proyecto personal en evolución. Está hecha con **Python y Flask**, y guarda los datos en un fichero **SQLite**, así que no necesita instalar ningún servidor de base de datos.
-
-> **Estado del proyecto:** se está rediseñando para convertirla en una biblioteca de material con feed, búsqueda, valoraciones, comentarios y una interfaz nueva adaptada al móvil. El diseño aprobado está en [`docs/superpowers/specs/`](docs/superpowers/specs/). Este README describe la versión actual.
+Nació como Trabajo de Fin de Grado en Ingeniería Informática (Universidad Politécnica de Madrid) y ahora es un proyecto personal en evolución. Está hecha con **Python y Flask**, interfaz adaptada al móvil (Bootstrap + htmx) y guarda los datos en un fichero **SQLite**, así que no necesita instalar ningún servidor de base de datos. El nombre mostrado se cambia con la variable `APP_NAME`.
 
 ---
 
@@ -27,9 +25,12 @@ Nació como Trabajo de Fin de Grado en Ingeniería Informática (Universidad Pol
 
 | Quién | Qué puede hacer |
 |---|---|
-| **Cualquier visitante** | Ver la portada y las páginas legales (aviso legal, privacidad, cookies). Registrarse. |
-| **Usuario registrado** | Publicar contenido con archivos adjuntos (PDF, Word, texto, imágenes), ver las publicaciones de otros usuarios, enviar mensajes privados con adjuntos y gestionar su perfil (foto, biografía, redes sociales, email, contraseña, borrar la cuenta). |
-| **Administrador** | Todo lo anterior, más un panel para ver los usuarios y su historial de accesos, y bloquear o desbloquear cuentas. |
+| **Cualquier visitante** | Ver la portada y las páginas legales (aviso legal, privacidad, cookies, sobre, contacto). Registrarse e iniciar sesión. |
+| **Usuario registrado** | **Subir material** (de 1 a 5 ficheros, con asignatura, curso y tipo), editarlo y borrarlo. **Explorar** el feed con búsqueda, filtros y orden. **Valorar** (1 a 5 estrellas), **comentar**, **guardar** en favoritos y **reportar** material o comentarios. Enviar y recibir **mensajes privados** con adjunto. Ver perfiles públicos y el directorio de usuarios. Gestionar su cuenta (foto, biografía, redes, email, contraseña, borrar la cuenta). |
+| **Profesor** | Lo mismo que un usuario, con un **distintivo de profesor** visible en su material, comentarios y perfil. Lo concede un administrador. |
+| **Administrador** | Todo lo anterior, más: gestionar **asignaturas** (crear, renombrar, archivar), **usuarios** (bloquear, desbloquear, distintivo de profesor, historial de accesos), la **cola de reportes** (ocultar el contenido o descartar el reporte) y el contenido **oculto** (restaurarlo). |
+
+Los usuarios bloqueados pierden el acceso en su siguiente petición. El material y los comentarios ocultos solo los ve el administrador (y el autor su propio material).
 
 ---
 
@@ -81,7 +82,13 @@ export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
 
 En Windows (PowerShell): `$env:SECRET_KEY = python -c "import secrets; print(secrets.token_hex(32))"`
 
-**5. Crea el primer administrador.** La aplicación **no** trae usuarios de serie. El comando te pide la contraseña dos veces (mínimo 8 caracteres) y no la muestra mientras escribes.
+**5. Crea la base de datos.** Aplica las migraciones y crea `instance/database.db` con todas las tablas.
+
+```bash
+flask --app main db upgrade
+```
+
+**6. Crea el primer administrador.** La aplicación **no** trae usuarios de serie. El comando te pide la contraseña dos veces (mínimo 8 caracteres) y no la muestra mientras escribes.
 
 ```bash
 flask --app main create-admin --email tu-email@ejemplo.com
@@ -89,13 +96,13 @@ flask --app main create-admin --email tu-email@ejemplo.com
 
 Opcionalmente, añade `--name` y `--surname` para el nombre que se mostrará.
 
-**6. Arranca la aplicación**
+**7. Arranca la aplicación**
 
 ```bash
 python main.py
 ```
 
-Abre **http://127.0.0.1:5000** en el navegador e inicia sesión con el administrador que acabas de crear. Para pararla, pulsa `Ctrl+C` en el terminal.
+Abre **http://127.0.0.1:5000** en el navegador e inicia sesión con el administrador que acabas de crear. Para pararla, pulsa `Ctrl+C` en el terminal. Para usar otro puerto: `flask --app main run --port 5080`.
 
 ---
 
@@ -105,7 +112,10 @@ La aplicación se configura con variables de entorno.
 
 | Variable | Obligatoria | Para qué sirve |
 |---|---|---|
-| `SECRET_KEY` | Sí, en producción | Firma las cookies de sesión y los tokens CSRF. Debe ser larga, aleatoria y **secreta**: quien la conozca puede hacerse pasar por cualquier usuario. Si no la defines, la aplicación genera una temporal, avisa en el log y las sesiones se pierden cada vez que se reinicia. |
+| `SECRET_KEY` | Sí, en producción | Firma las cookies de sesión y los tokens CSRF. Debe ser larga, aleatoria y **secreta**: quien la conozca puede hacerse pasar por cualquier usuario. Si no la defines fuera de producción, la aplicación genera una temporal, avisa en el log y las sesiones se pierden cada vez que se reinicia. |
+| `APP_ENV` | No | `development` (por defecto) o `production`. En producción la cookie de sesión es solo HTTPS, se envía HSTS y `SECRET_KEY` es obligatoria. |
+| `TRUSTED_PROXIES` | No | Número de proxys inversos de confianza delante de la app (por ejemplo `1` con nginx). Solo entonces se usa `X-Forwarded-For`/`-Proto` para la IP y el esquema reales. |
+| `APP_NAME` | No | Nombre mostrado en la interfaz. Por defecto, `Campus Share`. |
 
 Las variables de entorno solo duran mientras el terminal está abierto. Para no tener que definir `SECRET_KEY` cada vez, añade la línea `export` a tu `~/.bashrc` o `~/.zshrc`, o usa el gestor de secretos de tu servidor.
 
@@ -113,10 +123,12 @@ Las variables de entorno solo duran mientras el terminal está abierto. Para no 
 
 | Ruta | Contenido |
 |---|---|
-| `instance/database.db` | La base de datos SQLite. Para empezar de cero, para la aplicación y borra este fichero. |
-| `website/static/uploads/` | Archivos adjuntos de publicaciones y mensajes. |
-| `website/static/profile_pics/` | Fotos de perfil (además de la imagen por defecto). |
-| `app.log` | Registro de actividad. |
+| `instance/database.db` | La base de datos SQLite. Para empezar de cero, para la aplicación, borra este fichero y ejecuta `flask --app main db upgrade`. |
+| `instance/uploads/materials/` | Ficheros de los materiales (privados: solo se descargan con sesión iniciada). |
+| `instance/uploads/messages/` | Adjuntos de mensajes (solo los pueden descargar emisor y receptor). |
+| `instance/uploads/avatars/` | Fotos de perfil redimensionadas (300×300 como máximo). |
+
+Haz copia de seguridad de la carpeta `instance/` completa: contiene la base de datos y todos los ficheros subidos.
 
 ---
 
@@ -126,25 +138,32 @@ Las variables de entorno solo duran mientras el terminal está abierto. Para no 
 |---|---|
 | Arrancar la aplicación | `python main.py` (con el entorno virtual activo y `SECRET_KEY` definida) |
 | Crear otro administrador | `flask --app main create-admin --email otro@ejemplo.com` |
-| Bloquear o desbloquear un usuario | Inicia sesión como admin → menú **Admin** |
-| Empezar con la base de datos vacía | Para la app, borra `instance/database.db` y vuelve a crear el admin |
-| Actualizar a la última versión | `git pull` y después `pip install -r requirements.txt` |
+| Crear asignaturas | Inicia sesión como admin → **Admin** → **Asignaturas** (sin asignaturas nadie puede subir material) |
+| Dar el distintivo de profesor, bloquear o desbloquear | Admin → **Usuarios** |
+| Moderar un reporte | Admin → **Reportes** → ocultar el contenido o descartar el reporte |
+| Empezar con la base de datos vacía | Para la app, borra `instance/database.db` y ejecuta `flask --app main db upgrade` y `create-admin` |
+| Actualizar a la última versión | `git pull`, `pip install -r requirements.txt` y `flask --app main db upgrade` |
+| Cambiar el modelo de datos (desarrollo) | Edita `website/models.py`, ejecuta `flask --app main db migrate -m "descripción"`, revisa el script de `migrations/versions/` y aplícalo con `db upgrade` |
 
 ---
 
 ## Tests y calidad de código
 
-Los tests usan una base de datos en memoria, así que **no tocan tus datos**.
+Los tests usan una base de datos en memoria y carpetas temporales, así que **no tocan tus datos**. Las herramientas de desarrollo están separadas de las dependencias de la aplicación:
+
+```bash
+pip install -r requirements-dev.txt
+```
 
 ```bash
 python -m pytest
 ```
 
-Para comprobar el estilo del código y buscar vulnerabilidades conocidas en las dependencias, instala estas dos herramientas (no forman parte de la aplicación):
-
 ```bash
-pip install ruff pip-audit
+python -m pytest -q --cov=website --cov-report=term-missing
 ```
+
+La cobertura debe mantenerse por encima del 85 %.
 
 ```bash
 ruff check .
@@ -156,53 +175,82 @@ pip-audit -r requirements.txt
 
 | Fichero | Qué prueba |
 |---|---|
-| `test_unit.py` | Registro, login, publicaciones, mensajes y biografía |
-| `test_integration.py` | Flujos completos: registro → login → publicación; bloqueo y desbloqueo por un admin |
-| `test_security.py` | Una prueba por cada fallo de seguridad corregido, para que no vuelva a aparecer |
-| `conftest.py` | Utilidades comunes de los tests (aplicación de prueba, crear usuario, iniciar sesión) |
+| `test_models.py`, `test_filters.py`, `test_config.py` | Modelos y restricciones, filtros de fecha, configuración por entorno |
+| `test_auth.py`, `test_unit.py`, `test_integration.py` | Registro, login, límite de intentos, bloqueo y flujos completos |
+| `test_uploads.py`, `test_files.py` | Validación del contenido real de los ficheros, nombres, descargas privadas |
+| `test_material_crud.py`, `test_explore.py`, `test_detail_rating_favorites.py`, `test_comments_reports.py` | Material, feed y filtros, valoraciones, guardados, comentarios y reportes |
+| `test_admin_subjects.py`, `test_admin_users_reports.py` | Panel de administración y permisos |
+| `test_users.py`, `test_messages.py` | Perfiles, cuenta, directorio y mensajería |
+| `test_layout.py`, `test_migrations.py` | Cabeceras de seguridad, SRI, plantillas sin JS/CSS en línea, migraciones, CSRF y ausencia de rutas antiguas |
+| `test_security.py` | Una prueba por cada fallo de seguridad corregido en la Fase 2, para que no vuelva a aparecer |
+| `conftest.py` | Utilidades comunes (aplicación de prueba, crear usuario, iniciar sesión) |
 
 ---
 
 ## Estructura del proyecto
 
 ```
-flaskwebapp_university/
-├── main.py                 # Punto de entrada: crea la app y arranca el servidor
-├── requirements.txt        # Dependencias con versiones fijadas
+campus-share/
+├── main.py                  # Punto de entrada: crea la app y arranca el servidor
+├── requirements.txt         # Dependencias de la aplicación, con versiones fijadas
+├── requirements-dev.txt     # Herramientas de desarrollo (pytest, cobertura, ruff, pip-audit)
+├── migrations/              # Migraciones de la base de datos (Alembic / Flask-Migrate)
 ├── website/
-│   ├── __init__.py         # create_app(): configuración, extensiones y blueprints
-│   ├── auth.py             # Registro, login y logout
-│   ├── views.py            # Perfil, publicaciones, mensajes, lista de usuarios, panel de admin
-│   ├── models.py           # Tablas: User, Publication, Message, LoginRecord
-│   ├── commands.py         # Comandos de terminal (create-admin)
-│   ├── templates/          # Páginas HTML (plantillas Jinja2)
-│   └── static/             # CSS, JS, imágenes y archivos subidos
-├── conftest.py, test_*.py  # Tests
+│   ├── __init__.py          # create_app(): configuración, extensiones y blueprints
+│   ├── config.py            # Configuración por entorno (development, testing, production)
+│   ├── extensions.py        # db, login_manager, csrf, limiter, migrate
+│   ├── models.py            # Tablas: User, Subject, Material, MaterialFile, Rating, Favorite, Comment, Report, Message, LoginRecord
+│   ├── forms.py             # Formularios (Flask-WTF)
+│   ├── filters.py           # Filtros Jinja (hora local de Madrid, "hace X")
+│   ├── commands.py          # Comandos de terminal (create-admin)
+│   ├── blueprints/          # main, auth, materials, users, messages, admin, files
+│   ├── services/            # permissions, uploads (validación y guardado), headers (CSP y similares)
+│   ├── templates/           # Páginas HTML (Jinja2) y fragmentos en partials/ para htmx
+│   └── static/              # css/app.css, js/app.js, img/default-avatar.jpg
+├── instance/                # Base de datos y ficheros subidos (no va a git)
+├── tests/                   # Tests (pytest)
 └── docs/
-    ├── audit/AUDIT.md      # Auditoría de seguridad y calidad, con el estado de cada hallazgo
-    └── superpowers/specs/  # Documentos de diseño
+    ├── audit/AUDIT.md       # Auditoría de seguridad y calidad, con el estado de cada hallazgo
+    └── superpowers/specs/   # Documento de diseño del rediseño
 ```
 
+**Rutas principales:**
+
+| Ruta | Qué es | Acceso |
+|---|---|---|
+| `/` | Portada (si hay sesión, redirige al feed) | Público |
+| `/registro`, `/login` | Alta e inicio de sesión | Público |
+| `/explorar` | Feed de material con búsqueda, filtros (asignatura, curso, tipo) y orden | Sesión |
+| `/material/nuevo`, `/material/<id>`, `/material/<id>/editar` | Subir, ver y editar material (valorar, comentar, guardar, reportar desde el detalle) | Sesión (editar: autor o admin) |
+| `/guardados` | Material guardado en favoritos | Sesión |
+| `/mensajes`, `/mensajes/<id>` | Bandeja y conversación con un usuario | Sesión |
+| `/u/<id>`, `/usuarios` | Perfil público y directorio | Sesión |
+| `/cuenta` | Ajustes de la cuenta | Sesión |
+| `/archivos/material/<id>`, `/archivos/mensaje/<id>`, `/avatar/<id>` | Descarga privada de ficheros | Sesión (mensajes: emisor y receptor) |
+| `/admin`, `/admin/usuarios`, `/admin/asignaturas`, `/admin/reportes`, `/admin/oculto` | Panel de administración | Administrador |
+
+Las URLs antiguas (`/home`, `/profile`, `/userlist`, `/publications`, `/messages`) redirigen a las nuevas.
+
 **Tecnologías:**
-- Flask 3.1, Flask-SQLAlchemy (SQLite), Flask-Login (sesiones) y Flask-WTF (protección CSRF).
-- Flask-Limiter (límite de intentos), Pillow (validar y redimensionar imágenes) y bleach (limpiar texto).
-- En la interfaz, Bootstrap desde CDN.
+- Flask 3.1, Flask-SQLAlchemy (SQLite), Flask-Migrate (Alembic), Flask-Login (sesiones) y Flask-WTF (CSRF).
+- Flask-Limiter (límite de intentos), Flask-Compress, Pillow (validar y redimensionar imágenes) y email-validator.
+- En la interfaz, Bootstrap 5, Bootstrap Icons y htmx desde CDN con comprobación de integridad (SRI). Todo funciona también sin JavaScript.
 
 ---
 
 ## Seguridad
 
-Tras la auditoría de [`docs/audit/AUDIT.md`](docs/audit/AUDIT.md) la aplicación:
+Tras la auditoría de [`docs/audit/AUDIT.md`](docs/audit/AUDIT.md) y el rediseño, la aplicación:
 
-- Exige ser administrador para bloquear o desbloquear cuentas.
-- Lee la clave de sesión del entorno; nunca está escrita en el código.
-- No crea cuentas con contraseñas conocidas y rechaza las antiguas cuentas por defecto (`admin@admin.com` y `user1@user.com`).
-- Guarda los archivos subidos con nombres aleatorios, para que nadie pueda sobrescribir los de otros.
-- Comprueba el contenido real de las imágenes subidas, no solo su extensión.
-- Usa versiones de dependencias sin vulnerabilidades conocidas.
-- Protege los formularios frente a CSRF, guarda las contraseñas cifradas (hash) y limita los intentos de login.
+- Exige el rol adecuado en cada ruta (administrador, autor, participante de la conversación) y comprueba que los usuarios bloqueados pierden la sesión.
+- Lee la clave de sesión del entorno; nunca está escrita en el código. No crea cuentas con contraseñas conocidas y rechaza las antiguas cuentas por defecto.
+- Guarda **todos los ficheros subidos fuera de `static/`**, en `instance/uploads/`, con nombres aleatorios, y solo los sirve a usuarios con sesión (los adjuntos de mensajes, solo a emisor y receptor), los documentos como descarga (las imágenes en línea) y todo con `nosniff`.
+- Comprueba el contenido real de cada fichero, no solo su extensión, y limita el tamaño de la petición a 24 MB.
+- Envía cabeceras de seguridad (CSP sin scripts ni estilos en línea, X-Frame-Options, HSTS en producción) y carga los recursos de CDN con SRI.
+- Protege todos los formularios y acciones con CSRF (logout incluido), guarda las contraseñas con hash, limita los intentos de login y pide la contraseña actual para cambiar el email o la contraseña.
+- Usa versiones de dependencias sin vulnerabilidades conocidas (`pip-audit`).
 
-**Limitación conocida (pendiente en el rediseño):** los adjuntos se sirven desde `static/`, así que cualquiera que conozca la URL de un adjunto puede descargarlo sin iniciar sesión. Los nombres son aleatorios y no se pueden adivinar, pero no compartas esos enlaces. Ver SEC-04 en la auditoría.
+**Pendiente** (ver la auditoría): el límite de intentos vive en memoria y no se comparte entre varios procesos (SEC-10), la sesión "recordarme" no tiene política de caducidad (SEC-11) y el historial de accesos guarda IPs sin plazo de retención (SEC-13).
 
 Si encuentras un fallo de seguridad, comunícalo en privado al autor del repositorio en lugar de abrir un issue público.
 
@@ -216,8 +264,9 @@ Si encuentras un fallo de seguridad, comunícalo en privado al autor del reposit
 | `flask: command not found` | El entorno virtual no está activo. Ejecuta `source .venv/bin/activate` (o `.venv\Scripts\Activate.ps1` en Windows). |
 | En el log aparece `SECRET_KEY no está definida` | Falta el paso 4 de la instalación. Funciona, pero las sesiones se pierden al reiniciar. |
 | Inicio sesión y vuelvo a la pantalla de login | La cookie de sesión está marcada como "solo HTTPS". Chrome y Firefox la aceptan en `http://127.0.0.1`, pero Safari no. Usa Chrome o Firefox en desarrollo. |
-| "Too many failed login attempts" | Tras 5 intentos fallidos, la IP queda bloqueada 10 minutos. Espera o reinicia la aplicación (el contador está en memoria). |
-| `Default credentials are disabled` | Esa cuenta es una de las antiguas cuentas por defecto. Crea un administrador nuevo con `create-admin`. |
+| "Demasiados intentos fallidos" | Tras 5 intentos fallidos, la IP queda bloqueada 10 minutos. Espera o reinicia la aplicación (el contador está en memoria). |
+| `no such table: user` al arrancar o al crear el admin | Falta el paso 5: ejecuta `flask --app main db upgrade`. |
+| "Las credenciales por defecto están desactivadas" | Esa cuenta es una de las antiguas cuentas por defecto. Crea un administrador nuevo con `create-admin`. |
 | `A user with this email already exists` al crear el admin | Ya existe una cuenta con ese email. Usa otro, o borra `instance/database.db` si estás empezando de cero. |
 
 ---
