@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash
 
 from .extensions import db
 from .models import User, utcnow
+from .services.search import reindex_all
 
 MIN_PASSWORD_LENGTH = 8
 MAX_EMAIL_LENGTH = 100  # tamaño de la columna user.email
@@ -42,3 +43,11 @@ def create_admin_command(email, name, surname, password):
     db.session.add(admin)
     db.session.commit()
     click.echo(f"Admin {email} created.")
+
+
+@click.command("reindex-search")
+def reindex_search_command():
+    """Reconstruye el índice de búsqueda de texto completo."""
+    count = reindex_all()
+    db.session.commit()
+    click.echo(f"Reindexed {count} materials.")

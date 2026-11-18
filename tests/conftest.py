@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash
 
 from website import create_app, db
 from website.models import User, utcnow
+from website.services.search import ensure_search_index
 
 PASSWORD = "password123"
 
@@ -49,6 +50,7 @@ def app(tmp_path):
     app.test_client_class = BufferedClient
     with app.app_context():
         db.create_all()
+        ensure_search_index()
         yield app
         db.session.remove()
         db.drop_all()

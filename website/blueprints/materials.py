@@ -13,7 +13,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, column, func, literal_column, select, table
 from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import BadRequest, NotFound
 
@@ -37,13 +37,13 @@ from ..models import (
 from ..services.notifications import notify_comment, notify_new_report
 from ..services.permissions import can_view_material
 from ..services.query import (
-    escape_like,
     favorite_ids,
     feed_loader_options,
     int_param,
     page_param,
 )
 from ..services.reports import delete_reports_for
+from ..services.search import build_match
 from ..services.uploads import (
     ALLOWED_MATERIAL_EXTENSIONS,
     UploadError,
@@ -54,6 +54,7 @@ from ..services.uploads import (
 
 materials = Blueprint("materials", __name__)
 
+FTS = table("material_fts", column("rowid"), column("material_fts"))
 MAX_FILES = 5
 PER_PAGE = 12
 NO_FILES_MSG = "Sube al menos un fichero."
@@ -434,10 +435,11 @@ def build_feed_query(params: Mapping[str, str], viewer: User) -> Select:
     query = select(Material).where(Material.is_hidden.is_(False))
 
     text = (params.get("q") or "").strip()
+    match = None
     if text:
-        pattern = f"%{escape_like(text)}%"
-        query = query.where(or_(Material.title.ilike(pattern, escape="\\"),
-                                Material.description.ilike(pattern, escape="\\")))
+        match = build_match(text)
+        if match is not None:
+            query = query.join(FTS, FTS.c.rowid == Material.id).where(FTS.c.material_fts.op("MATCH")(match))
 
     subject_id = int_param(params.get("asignatura"))
     if subject_id is not None and db.session.get(Subject, subject_id) is not None:
@@ -454,7 +456,16 @@ def build_feed_query(params: Mapping[str, str], viewer: User) -> Select:
     if params.get("profesores") == "1":
         query = query.where(Material.author_id.in_(select(User.id).where(User.is_teacher.is_(True))))
 
-    if params.get("orden") == "valorados":
+    order = params.get("orden")
+    if order == "relevantes" and match is None:
+        order = None
+    elif order not in ("valorados", "recientes") and match is not None:
+        order = "relevantes"  # por defecto con texto de búsqueda
+
+    if order == "relevantes":
+        query = query.order_by(func.bm25(literal_column("material_fts")), Material.created_at.desc(),
+                               Material.id.desc())
+    elif order == "valorados":
         stats = (select(Rating.material_id.label("material_id"),
                         func.avg(Rating.stars).label("average"),
                         func.count(Rating.stars).label("votes"))

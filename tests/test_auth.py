@@ -4,6 +4,7 @@ from flask import g
 from tests.conftest import PASSWORD, login, make_user
 from website import db
 from website.models import LoginRecord, User
+from website.services.search import ensure_search_index
 
 GENERIC = "Email o contraseña incorrectos."
 
@@ -167,6 +168,7 @@ def test_login_post_limit_still_applies(tmp_path):
     with app.app_context():
         from website import db
         db.create_all()
+        ensure_search_index()
     client = app.test_client()
     codes = [client.post("/login", data={"email": "x@y.es", "password": "nope"}).status_code for _ in range(11)]
     assert codes[-1] == 429

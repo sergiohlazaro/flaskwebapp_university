@@ -3,6 +3,7 @@ from werkzeug.security import generate_password_hash
 
 from website import create_app, db
 from website.models import User
+from website.services.search import ensure_search_index
 
 
 @pytest.fixture
@@ -18,6 +19,7 @@ def app():
 
     with app.app_context():
         db.create_all()
+        ensure_search_index()
         yield app
 
         # Limpiar la base de datos después de cada prueba

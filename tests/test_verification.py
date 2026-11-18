@@ -8,6 +8,7 @@ from website import create_app, db
 from website.models import User
 from website.services import tokens
 from website.services.mail import sent_emails
+from website.services.search import ensure_search_index
 from website.services.tokens import make_verify_token
 
 SIGNUP_MSG = "Si el email no estaba registrado, te hemos enviado un enlace para activar la cuenta. Revísalo para empezar."
@@ -27,6 +28,7 @@ def app_verify(tmp_path):
     app.test_client_class = BufferedClient
     with app.app_context():
         db.create_all()
+        ensure_search_index()
         yield app
         db.session.remove()
         db.drop_all()
@@ -147,6 +149,7 @@ def test_resend_rate_limited_posts_only(tmp_path):
                       "REQUIRE_EMAIL_VERIFICATION": True})
     with app.app_context():
         db.create_all()
+        ensure_search_index()
     client = app.test_client()
     for _ in range(8):
         assert client.get("/verificar/reenviar").status_code == 200

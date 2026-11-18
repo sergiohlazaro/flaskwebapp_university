@@ -42,8 +42,13 @@
         <div class="col-6 col-lg-2">
             <label class="form-label small" for="f-orden">Ordenar por</label>
             <select class="form-select" id="f-orden" name="orden">
-                <option value="recientes" {{ 'selected' if filters.get('orden') != 'valorados' }}>Más recientes</option>
-                <option value="valorados" {{ 'selected' if filters.get('orden') == 'valorados' }}>Mejor valorados</option>
+                {% set q_text = filters.get('q', '').strip() %}
+                {% set order = filters.get('orden') if filters.get('orden') in ('recientes', 'valorados', 'relevantes') else '' %}
+                {% if q_text %}
+                <option value="relevantes" {{ 'selected' if order in ('', 'relevantes') }}>Más relevantes</option>
+                {% endif %}
+                <option value="recientes" {{ 'selected' if order == 'recientes' or (not q_text and order != 'valorados') }}>Más recientes</option>
+                <option value="valorados" {{ 'selected' if order == 'valorados' }}>Mejor valorados</option>
             </select>
         </div>
         <div class="col-12 col-lg-1">

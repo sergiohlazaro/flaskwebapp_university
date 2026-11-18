@@ -5,6 +5,7 @@ from conftest import PASSWORD, make_user
 from sqlalchemy import inspect
 
 from website import create_app, db
+from website.services.search import ensure_search_index
 
 EXPECTED_TABLES = {
     "user", "login_record", "subject", "material", "material_file", "rating", "comment",
@@ -43,6 +44,7 @@ def test_csrf_enforced_on_admin_and_material_posts(tmp_path):
     # contexto compartido entre clientes mezclaría los tokens de ambas sesiones.
     with app.app_context():
         db.create_all()
+        ensure_search_index()
         make_user("admin@example.com", role=0)
         make_user("user@example.com")
     admin = app.test_client()

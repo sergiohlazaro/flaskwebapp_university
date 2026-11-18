@@ -49,6 +49,10 @@ def create_app(test_config=None):
         hops = int(trusted_proxies)
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops)
 
+    from .services.search import check_fts5_available
+
+    check_fts5_available()
+
     Compress(app)
     csrf.init_app(app)
     limiter.init_app(app)
@@ -103,9 +107,10 @@ def create_app(test_config=None):
 
     # No se crean usuarios por defecto. El primer administrador se crea con:
     #   flask --app main create-admin
-    from .commands import create_admin_command
+    from .commands import create_admin_command, reindex_search_command
 
     app.cli.add_command(create_admin_command)
+    app.cli.add_command(reindex_search_command)
 
     from .filters import register_filters
 
