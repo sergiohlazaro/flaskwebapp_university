@@ -1,6 +1,7 @@
 import io
 
 import pytest
+from flask.testing import FlaskClient
 from PIL import Image
 from werkzeug.security import generate_password_hash
 
@@ -8,6 +9,32 @@ from website import create_app, db
 from website.models import User
 
 PASSWORD = "password123"
+
+
+class BufferedClient(FlaskClient):
+    """Lee y cierra cada respuesta: send_file deja abierto el fichero si no."""
+
+    def open(self, *args, **kwargs):
+        kwargs.setdefault("buffered", True)
+        return super().open(*args, **kwargs)
+
+
+@pytest.fixture(autouse=True)
+def _dispose_engines(monkeypatch):
+    """Cierra las conexiones SQLite de cada app creada en el test (incluidas las ad hoc)."""
+    apps = []
+    original = db.init_app
+
+    def init_app(app):
+        apps.append(app)
+        return original(app)
+
+    monkeypatch.setattr(db, "init_app", init_app)
+    yield
+    for created in apps:
+        with created.app_context():
+            for engine in db.engines.values():
+                engine.dispose()
 
 
 @pytest.fixture
@@ -19,6 +46,7 @@ def app(tmp_path):
         "WTF_CSRF_ENABLED": False,
         "UPLOAD_ROOT": str(tmp_path / "uploads"),
     })
+    app.test_client_class = BufferedClient
     with app.app_context():
         db.create_all()
         yield app

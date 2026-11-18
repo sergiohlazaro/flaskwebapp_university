@@ -19,6 +19,7 @@ class BaseConfig:
     TESTING = False
     WTF_CSRF_ENABLED = True
     RATELIMIT_ENABLED = True
+    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
 
 
 class DevelopmentConfig(BaseConfig):
@@ -29,6 +30,7 @@ class TestingConfig(BaseConfig):
     TESTING = True
     WTF_CSRF_ENABLED = False
     RATELIMIT_ENABLED = False
+    RATELIMIT_STORAGE_URI = "memory://"
 
 
 class ProductionConfig(BaseConfig):

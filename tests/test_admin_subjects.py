@@ -63,7 +63,7 @@ def test_create_duplicate_case_insensitive(client, admin):
 
 def test_create_duplicate_unicode_decomposed(client, admin):
     add_subject("Álgebra")
-    r = client.post("/admin/asignaturas", data={"name": "Álgebra"})
+    r = client.post("/admin/asignaturas", data={"name": "A\u0301lgebra"})
     assert r.status_code == 200
     assert DUP in r.get_data(as_text=True)
     assert Subject.query.count() == 1
@@ -148,7 +148,7 @@ def test_unknown_subject_404(client, admin):
 
 
 def test_model_nfc_and_none(app):
-    s = Subject(name="Álgebra ")
+    s = Subject(name="A\u0301lgebra ")
     assert s.name == "Álgebra"
     assert s.name_key == "álgebra"
     with pytest.raises(ValueError):

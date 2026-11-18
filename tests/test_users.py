@@ -85,6 +85,21 @@ def test_profile_lists_only_visible_materials(app, client):
     assert "Visible uno" in html and "Escondido" in html and "Oculto" in html
 
 
+def test_own_profile_shows_hidden_badge(app, client):
+    owner = make_user("o@example.com")
+    subject = _subject()
+    _material(owner, subject, "Escondido", hidden=True)
+    make_user("v@example.com")
+    login(client, "o@example.com")
+    html = client.get(f"/u/{owner.id}").get_data(as_text=True)
+    assert "Escondido" in html
+    assert '<span class="badge text-bg-warning mb-1">Oculto</span>' in html
+    client.post("/logout")
+    login(client, "v@example.com")
+    html = client.get(f"/u/{owner.id}").get_data(as_text=True)
+    assert "Escondido" not in html and "Oculto" not in html
+
+
 def test_profile_paginates_12_and_bounds_page(app, client):
     owner = make_user("o@example.com")
     subject = _subject()

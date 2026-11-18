@@ -142,8 +142,9 @@ def test_update_email_race_no_500(app, client, monkeypatch):
 
 
 def test_footer_shows_current_year(client):
-    from datetime import date
-    assert str(date.today().year) in client.get("/").get_data(as_text=True)
+    from datetime import UTC, datetime
+    # Mismo cálculo que la app (UTC): evita fallos en Nochevieja.
+    assert str(datetime.now(UTC).year) in client.get("/").get_data(as_text=True)
 
 
 def test_decorative_icons_are_aria_hidden(app, client):
@@ -168,8 +169,10 @@ def test_rating_block_has_aria_live(app, client):
     db.session.commit()
     login(client, viewer.email)
     html = client.get(f"/material/{material.id}").get_data(as_text=True)
-    tag = next(line for line in html.splitlines() if 'id="rating-block"' in line)
-    assert 'aria-live="polite"' in tag
+    import re
+    tag = re.search(r'<[^>]*\bid="rating-block"[^>]*>', html)
+    assert tag is not None
+    assert 'aria-live="polite"' in tag.group(0)
 
 
 def test_subject_name_key_length_200(app):
