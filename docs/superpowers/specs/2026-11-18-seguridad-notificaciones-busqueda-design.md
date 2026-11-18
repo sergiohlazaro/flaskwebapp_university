@@ -1,7 +1,7 @@
 # Diseño: seguridad pendiente, recuperación de contraseña, notificaciones y búsqueda
 
 - **Fecha:** 2026-11-18
-- **Estado:** pendiente de aprobación
+- **Estado:** aprobado por el usuario (2026-11-18)
 - **Rama:** `feature/fase5-seguridad-notificaciones-busqueda` (desde `main`, `c6ea3a5`)
 - **Orden:** se implementa después de las mejoras pequeñas de `2026-11-18-mejoras-revision-design.md`.
 - **Referencias:** `docs/audit/AUDIT.md` (SEC-09, SEC-10, SEC-11, SEC-13) y `2026-11-17-rediseno-biblioteca-material-design.md` (la app actual).

@@ -1,7 +1,7 @@
 # Diseño corto: mejoras pendientes de las revisiones (punto 4)
 
 - **Fecha:** 2026-11-18
-- **Estado:** pendiente de aprobación
+- **Estado:** aprobado por el usuario (2026-11-18)
 - **Rama:** `feature/fase5-seguridad-notificaciones-busqueda` (desde `main`, `c6ea3a5`)
 - **Tamaño:** cambio pequeño. Se implementa **antes** que el diseño de seguridad, notificaciones y búsqueda (`2026-11-18-seguridad-notificaciones-busqueda-design.md`).
 
