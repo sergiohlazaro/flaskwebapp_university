@@ -21,10 +21,10 @@ from ..models import (
     Message,
     Rating,
     Report,
-    ReportTarget,
     User,
 )
 from ..services.query import escape_like, favorite_ids, page_param
+from ..services.reports import delete_reports_for
 from ..services.uploads import UploadError, delete_upload, save_avatar
 
 users = Blueprint("users", __name__)
@@ -190,19 +190,11 @@ def _delete_user_data(user):
     material_ids = [m.id for m in materials]
     material_files = [f.stored_name for m in materials for f in m.files]
     own_comment_ids = list(db.session.scalars(select(Comment.id).where(Comment.author_id == uid)))
-    on_my_materials = list(db.session.scalars(
-        select(Comment.id).where(Comment.material_id.in_(material_ids)))) if material_ids else []
     avatar = user.avatar
 
     # Reportes: los que presentó y los que apuntan a lo que se va a borrar.
     db.session.execute(delete(Report).where(Report.reporter_id == uid))
-    if material_ids:
-        db.session.execute(delete(Report).where(Report.target_type == ReportTarget.MATERIAL,
-                                                Report.target_id.in_(material_ids)))
-    comment_ids = own_comment_ids + on_my_materials
-    if comment_ids:
-        db.session.execute(delete(Report).where(Report.target_type == ReportTarget.COMMENT,
-                                                Report.target_id.in_(comment_ids)))
+    delete_reports_for(material_ids=material_ids, comment_ids=own_comment_ids)
     db.session.execute(delete(Favorite).where(Favorite.user_id == uid))
     db.session.execute(delete(Rating).where(Rating.user_id == uid))
     db.session.execute(delete(Comment).where(Comment.author_id == uid))

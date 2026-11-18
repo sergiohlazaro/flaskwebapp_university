@@ -27,6 +27,7 @@ from ..models import (
 )
 from ..services.permissions import can_view_material
 from ..services.query import escape_like, favorite_ids, int_param, page_param
+from ..services.reports import delete_reports_for
 from ..services.uploads import (
     ALLOWED_MATERIAL_EXTENSIONS,
     UploadError,
@@ -253,6 +254,7 @@ def delete_comment(comment_id):
     if comment.author_id != current_user.id and not current_user.is_admin:
         abort(403)
     material = _visible_or_404(comment.material_id)
+    delete_reports_for(comment_ids=[comment.id])
     db.session.delete(comment)
     db.session.commit()
     return _comments_response(material)
@@ -372,6 +374,7 @@ def delete(material_id):
     if material.author_id != current_user.id and not current_user.is_admin:
         abort(403)
     stored = [f.stored_name for f in material.files]
+    delete_reports_for(material_ids=[material.id])
     db.session.delete(material)
     db.session.commit()
     for name in stored:

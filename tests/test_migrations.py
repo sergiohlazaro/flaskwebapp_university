@@ -63,3 +63,32 @@ def test_csrf_enforced_on_admin_and_material_posts(tmp_path):
     assert admin.post("/admin/asignaturas", data={"name": "Redes", "csrf_token": token}).status_code != 400
     token = token_from(user, "/material/nuevo")
     assert user.post("/material/nuevo", data={"csrf_token": token}).status_code != 400
+
+
+def test_autoincrement_migration_keeps_data_and_stops_id_reuse(tmp_path):
+    from flask_migrate import upgrade
+    from sqlalchemy import text
+    app = _tmp_app(tmp_path)
+    with app.app_context():
+        upgrade(revision="9377f229440c")
+        with db.engine.begin() as conn:
+            conn.execute(text("INSERT INTO user (id, name, surname, email, password, role, is_teacher, is_blocked, "
+                              "created_at) VALUES (1, 'a', 'b', 'a@b.es', 'x', 1, 0, 0, '2026-01-01')"))
+            conn.execute(text("INSERT INTO subject (id, name, name_key, is_archived) VALUES (1, 'R', 'r', 0)"))
+            conn.execute(text("INSERT INTO material (id, title, description, subject_id, author_id, created_at, "
+                              "updated_at, is_hidden) VALUES (1, 't', '', 1, 1, '2026-01-01', '2026-01-01', 0)"))
+            conn.execute(text("INSERT INTO material_file (material_id, stored_name, original_name, mime, size) "
+                              "VALUES (1, 's.pdf', 's.pdf', 'application/pdf', 1)"))
+            conn.execute(text("INSERT INTO comment (id, material_id, author_id, body, created_at, is_hidden) "
+                              "VALUES (1, 1, 1, 'c', '2026-01-01', 0)"))
+        upgrade()
+        with db.engine.begin() as conn:
+            assert conn.execute(text("SELECT count(*) FROM material_file")).scalar() == 1
+            assert conn.execute(text("SELECT count(*) FROM comment")).scalar() == 1
+            sql = " ".join(conn.execute(text("SELECT sql FROM sqlite_master WHERE name IN ('material','comment')"))
+                           .scalars())
+            assert sql.upper().count("AUTOINCREMENT") == 2
+            conn.execute(text("DELETE FROM comment"))
+            conn.execute(text("INSERT INTO comment (material_id, author_id, body, created_at, is_hidden) "
+                              "VALUES (1, 1, 'n', '2026-01-01', 0)"))
+            assert conn.execute(text("SELECT id FROM comment")).scalar() == 2

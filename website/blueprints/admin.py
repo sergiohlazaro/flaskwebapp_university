@@ -21,6 +21,7 @@ from ..models import (
 )
 from ..services.permissions import admin_required
 from ..services.query import escape_like, page_param
+from ..services.reports import resolve_pending_reports
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -199,15 +200,7 @@ def resolve_report(report_id):
     if target is None:
         abort(400)
     target.is_hidden = True
-    now = utcnow()
-    pending = db.session.scalars(
-        select(Report).where(Report.target_type == report.target_type, Report.target_id == report.target_id,
-                             Report.status == ReportStatus.PENDING)
-    ).all()
-    for item in pending:
-        item.status = ReportStatus.RESOLVED
-        item.resolved_by_id = current_user.id
-        item.resolved_at = now
+    resolve_pending_reports(report.target_type, report.target_id, current_user.id)
     db.session.commit()
     flash("Contenido ocultado y reportes resueltos.", "success")
     return redirect(url_for("admin.reports"))

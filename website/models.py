@@ -101,6 +101,9 @@ class Subject(db.Model):
 
 
 class Material(db.Model):
+    # AUTOINCREMENT: SQLite no reutiliza ids de filas borradas (evita heredar reportes huérfanos).
+    __table_args__ = ({"sqlite_autoincrement": True},)
+
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(150), nullable=False)
     description = db.Column(db.Text, nullable=False, default="")
@@ -157,6 +160,8 @@ class Favorite(db.Model):
 
 
 class Comment(db.Model):
+    __table_args__ = ({"sqlite_autoincrement": True},)
+
     id = db.Column(db.Integer, primary_key=True)
     material_id = db.Column(db.Integer, db.ForeignKey("material.id", ondelete="CASCADE"), nullable=False)
     author_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
