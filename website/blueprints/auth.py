@@ -50,7 +50,7 @@ def _safe_next(target):
 
 
 @auth.route('/login', methods=['GET', 'POST'])
-@limiter.limit("10 per hour")  # Limite global por IP
+@limiter.limit("10 per hour", methods=["POST"])  # Limite por IP; solo cuentan los envíos
 def login():
     ip_address = request.remote_addr
     form = LoginForm()
@@ -97,7 +97,7 @@ def login():
 
 
 @auth.route('/registro', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("5 per minute", methods=["POST"])
 def signup():
     form = SignupForm()
     if form.validate_on_submit():

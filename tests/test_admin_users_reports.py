@@ -137,7 +137,7 @@ def test_non_admin_cannot_toggle_teacher(client):
     assert db.session.get(User, victim.id).is_teacher is False
 
 
-def test_admin_cannot_block_self_or_last_admin(client):
+def test_admin_cannot_block_self(client):
     admin = _admin(client)
     r = client.post(f"/admin/usuarios/{admin.id}/bloquear", follow_redirects=True)
     assert r.status_code == 400

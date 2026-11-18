@@ -93,13 +93,8 @@ def block(user_id):
     if user.id == current_user.id:
         flash("No puedes bloquear tu propia cuenta.", "error")
         return users(), 400
-    if user.is_admin:
-        others = db.session.scalar(
-            select(func.count(User.id)).where(User.role == 0, User.is_blocked.is_(False), User.id != user.id)
-        )
-        if not others:
-            flash("No se puede bloquear al último administrador activo.", "error")
-            return users(), 400
+    # No hace falta proteger al "último administrador activo": quien bloquea es siempre un
+    # administrador activo distinto del bloqueado (el autobloqueo se rechaza arriba).
     user.is_blocked = True
     db.session.commit()
     flash("Usuario bloqueado.", "success")

@@ -155,3 +155,26 @@ def test_legacy_default_credentials_rejected_with_own_message(app, client):
 
     assert "Las credenciales por defecto están desactivadas" in response.get_data(as_text=True)
     assert client.get("/explorar").status_code == 302
+
+
+def test_login_and_signup_limits_count_only_posts(tmp_path):
+    from website import create_app
+    app = create_app({"TESTING": True, "SECRET_KEY": "k", "RATELIMIT_ENABLED": True,
+                      "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:", "UPLOAD_ROOT": str(tmp_path / "up")})
+    client = app.test_client()
+    for _ in range(12):
+        assert client.get("/login").status_code == 200
+    for _ in range(7):
+        assert client.get("/registro").status_code == 200
+
+
+def test_login_post_limit_still_applies(tmp_path):
+    from website import create_app
+    app = create_app({"TESTING": True, "SECRET_KEY": "k", "RATELIMIT_ENABLED": True,
+                      "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:", "UPLOAD_ROOT": str(tmp_path / "up")})
+    with app.app_context():
+        from website import db
+        db.create_all()
+    client = app.test_client()
+    codes = [client.post("/login", data={"email": "x@y.es", "password": "nope"}).status_code for _ in range(11)]
+    assert codes[-1] == 429
