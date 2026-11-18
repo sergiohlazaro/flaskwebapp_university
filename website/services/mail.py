@@ -6,6 +6,7 @@ sin propagación); el log general de la app nunca lo recibe.
 import logging
 import os
 import smtplib
+import threading
 from email.message import EmailMessage
 from logging.handlers import TimedRotatingFileHandler
 
@@ -33,8 +34,11 @@ def init_mail(app):
     logger.addHandler(handler)
 
 
-def send_email(to: str, subject: str, template: str, **context) -> None:
-    """Renderiza `template` y lo envía por el backend configurado. Nunca lanza por fallos de envío."""
+def send_email(to: str, subject: str, template: str, **context):
+    """Renderiza `template` y lo envía por el backend configurado. Nunca lanza por fallos de envío.
+
+    Con `smtp` el envío va en un hilo demonio y se devuelve el hilo (para esperarlo en tests).
+    """
     # Sin render_template: los context processors de la web asumen una petición.
     body = current_app.jinja_env.get_template(template).render(
         app_name=current_app.config["APP_NAME"], **context)
@@ -43,7 +47,7 @@ def send_email(to: str, subject: str, template: str, **context) -> None:
         current_app.extensions.setdefault("sent_emails", []).append(
             {"to": to, "subject": subject, "body": body})
     elif backend == "smtp":
-        _send_smtp(to, subject, body)
+        return _send_smtp(to, subject, body)
     else:
         logging.getLogger(MAIL_LOGGER).info("To: %s\nSubject: %s\n\n%s", to, subject, body)
 
@@ -54,19 +58,37 @@ def sent_emails() -> list[dict]:
 
 
 def _send_smtp(to, subject, body):
-    cfg = current_app.config
+    """Compone el mensaje en la petición y delega el envío en un hilo demonio (sin oráculo de tiempos).
+
+    Devuelve el hilo (o None si no se pudo componer); los tests lo esperan con `join`.
+    """
+    app = current_app._get_current_object()
+    cfg = app.config
     try:
         msg = EmailMessage()
         msg["From"] = cfg["MAIL_DEFAULT_SENDER"]
         msg["To"] = to  # CR/LF en cabeceras lanza ValueError
         msg["Subject"] = subject
         msg.set_content(body)
+    except Exception as exc:  # noqa: BLE001 - un fallo de correo no debe romper la petición
+        app.logger.error("No se pudo enviar el email (%s)", type(exc).__name__)
+        return None
+    settings = {k: cfg[k] for k in ("MAIL_SERVER", "MAIL_PORT", "MAIL_USE_TLS", "MAIL_USERNAME", "MAIL_PASSWORD")}
+    thread = threading.Thread(target=_deliver, args=(app.logger, settings, msg), daemon=True,
+                              name="mail-smtp")
+    thread.start()
+    return thread
+
+
+def _deliver(logger, cfg, msg):
+    # Solo datos planos: nada de contexto de petición ni de aplicación.
+    try:
         with smtplib.SMTP(cfg["MAIL_SERVER"], cfg["MAIL_PORT"], timeout=10) as smtp:
             if cfg["MAIL_USE_TLS"]:
                 smtp.starttls()
             if cfg["MAIL_USERNAME"]:
                 smtp.login(cfg["MAIL_USERNAME"], cfg["MAIL_PASSWORD"])
             smtp.send_message(msg)
-    except Exception as exc:  # noqa: BLE001 - un fallo de correo no debe romper la petición
+    except Exception as exc:  # noqa: BLE001
         # Solo el tipo: str(exc) puede incluir destinatarios u otros datos del mensaje.
-        current_app.logger.error("No se pudo enviar el email (%s)", type(exc).__name__)
+        logger.error("No se pudo enviar el email (%s)", type(exc).__name__)

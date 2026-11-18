@@ -1,6 +1,7 @@
 import importlib
 import logging
 import smtplib
+import time
 
 import pytest
 
@@ -67,7 +68,7 @@ def test_smtp_backend_failure_does_not_raise(tmp_path, monkeypatch, caplog):
     monkeypatch.setattr(smtplib, "SMTP", boom)
     with app.app_context(), caplog.at_level(logging.DEBUG):
         send_email("ana@example.com", "Hola", "email/password_reset.txt", name="Ana",
-                   link="http://x/SECRETLINK")
+                   link="http://x/SECRETLINK").join(timeout=5)
     assert "SECRETLINK" not in caplog.text
     assert "OSError" in caplog.text
     assert "ana@example.com" not in caplog.text
@@ -108,9 +109,37 @@ def test_smtp_backend_sends_message(tmp_path, monkeypatch):
 
     monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
     with app.app_context():
-        send_email("ana@example.com", "Hola", "email/email_verify.txt", name="Ana", link="l")
+        send_email("ana@example.com", "Hola", "email/email_verify.txt", name="Ana", link="l").join(timeout=5)
     assert calls == [("init", "smtp.test", 587, 10), ("starttls",), ("login", "u", "p"),
                      ("send", "ana@example.com", "Hola")]
+
+
+def test_smtp_send_does_not_block_request(tmp_path, monkeypatch):
+    app = _mail_app(tmp_path, MAIL_BACKEND="smtp", MAIL_SERVER="smtp.test")
+    done = []
+
+    class SlowSMTP:
+        def __init__(self, *a, **k):
+            time.sleep(1)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def send_message(self, msg):
+            done.append(msg["To"])
+
+    monkeypatch.setattr(smtplib, "SMTP", SlowSMTP)
+    monkeypatch.setitem(app.config, "MAIL_USE_TLS", False)
+    with app.app_context():
+        start = time.monotonic()
+        thread = send_email("ana@example.com", "Hola", "email/email_verify.txt", name="Ana", link="l")
+        assert time.monotonic() - start < 0.5
+        assert done == []
+        thread.join(timeout=5)
+    assert done == ["ana@example.com"]
 
 
 def test_require_verification_defaults_follow_backend(monkeypatch):
