@@ -79,17 +79,27 @@ def test_search_matches_subject_and_author_name(app, client, user):
 
 def test_search_relevance_default_with_q_only(app, client, user):
     s = _subject("Redes")
-    _material(user, s, "Alfa", "sobre grafos", minutes=2)
-    _material(user, s, "Beta", "nada", minutes=1)
-    # Beta tiene el término en el título y en la descripción: más relevante, aunque sea más antiguo
-    _material(user, s, "Gamma grafos", "grafos grafos", minutes=0)
-    without_q = client.get("/explorar").get_data(as_text=True)
-    assert "Más relevantes" not in without_q
+    # La coincidencia en el título (Beta) no es ni la más antigua ni la más nueva ni la de mayor id.
+    _material(user, s, "Alfa", "sobre grafos", minutes=0)
+    _material(user, s, "Beta grafos", "nada", minutes=1)
+    _material(user, s, "Gamma", "sobre grafos", minutes=2)
+    assert "Más relevantes" not in client.get("/explorar").get_data(as_text=True)
     with_q = client.get("/explorar?q=grafos").get_data(as_text=True)
     assert "Más relevantes" in with_q
-    assert with_q.index("Gamma grafos") < with_q.index(">Alfa<")
+    assert with_q.index("Beta grafos") < with_q.index(">Gamma<")
+    assert with_q.index("Beta grafos") < with_q.index(">Alfa<")
     recent = client.get("/explorar?q=grafos&orden=recientes").get_data(as_text=True)
-    assert recent.index(">Alfa<") < recent.index("Gamma grafos")
+    assert recent.index(">Gamma<") < recent.index("Beta grafos") < recent.index(">Alfa<")
+
+
+def test_title_match_outranks_description_match(app, client, user):
+    s = _subject("Redes")
+    _material(user, s, "Alfa", "grafos", minutes=0)
+    _material(user, s, "Beta grafos", "otra cosa", minutes=1)
+    _material(user, s, "Gamma", "grafos", minutes=2)
+    html = client.get("/explorar?q=grafos").get_data(as_text=True)
+    assert html.index("Beta grafos") < html.index(">Alfa<")
+    assert html.index("Beta grafos") < html.index(">Gamma<")
 
 
 def test_relevance_without_valid_terms_ignores_q(app, client, user):
@@ -126,6 +136,20 @@ def test_index_follows_edit_delete_subject_rename_user_rename(app, client, user)
     db.session.delete(material)
     db.session.commit()
     assert _fts_ids() == []
+
+
+def test_index_follows_subject_change_and_hidden_toggle(app, client, user):
+    old, new = _subject("Redes"), _subject("Criptografía")
+    material = _material(user, old, "Alfa")
+    material.subject_id = new.id
+    db.session.commit()
+    assert _found(client, "criptografia") == ["Alfa"] and _found(client, "redes") == []
+    material.is_hidden = True
+    db.session.commit()
+    assert _found(client, "criptografia") == []
+    material.is_hidden = False
+    db.session.commit()
+    assert _found(client, "criptografia") == ["Alfa"]
 
 
 def test_rollback_leaves_index_consistent(app, user):

@@ -47,7 +47,7 @@ def ensure_search_index(connection=None) -> None:
         conn.execute(text(_CREATE_SQL))
 
 
-def _reindex(executor, where="", params=None, ids=None):
+def _reindex(executor, where="", params=None):
     """Borra y reinserta las filas indicadas (todas si no hay condición) a partir de las tablas."""
     params = params or {}
     if where:

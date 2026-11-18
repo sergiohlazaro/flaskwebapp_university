@@ -463,7 +463,7 @@ def build_feed_query(params: Mapping[str, str], viewer: User) -> Select:
         order = "relevantes"  # por defecto con texto de búsqueda
 
     if order == "relevantes":
-        query = query.order_by(func.bm25(literal_column("material_fts")), Material.created_at.desc(),
+        query = query.order_by(func.bm25(literal_column("material_fts"), 10.0, 3.0, 1.0, 1.0), Material.created_at.desc(),
                                Material.id.desc())
     elif order == "valorados":
         stats = (select(Rating.material_id.label("material_id"),
