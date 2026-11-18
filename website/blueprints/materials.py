@@ -35,7 +35,13 @@ from ..models import (
     User,
 )
 from ..services.permissions import can_view_material
-from ..services.query import escape_like, favorite_ids, int_param, page_param
+from ..services.query import (
+    escape_like,
+    favorite_ids,
+    feed_loader_options,
+    int_param,
+    page_param,
+)
 from ..services.reports import delete_reports_for
 from ..services.uploads import (
     ALLOWED_MATERIAL_EXTENSIONS,
@@ -347,7 +353,8 @@ def saved():
     page = page_param(request.args.get("pagina"))
     query = (select(Material).join(Favorite, Favorite.material_id == Material.id)
              .where(Favorite.user_id == current_user.id, Material.is_hidden.is_(False))
-             .order_by(Favorite.created_at.desc(), Material.id.desc()))
+             .order_by(Favorite.created_at.desc(), Material.id.desc())
+             .options(*feed_loader_options()))
     pagination = db.paginate(query, page=page, per_page=PER_PAGE, error_out=False)
 
     def page_url(number):
@@ -459,7 +466,7 @@ def build_feed_query(params: Mapping[str, str], viewer: User) -> Select:
 def explore():
     params = request.args
     page = page_param(params.get("pagina"))
-    pagination = db.paginate(build_feed_query(params, current_user), page=page,
+    pagination = db.paginate(build_feed_query(params, current_user).options(*feed_loader_options()), page=page,
                              per_page=PER_PAGE, error_out=False)
 
     def page_url(number):

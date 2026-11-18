@@ -23,7 +23,7 @@ from ..models import (
     Report,
     User,
 )
-from ..services.query import escape_like, favorite_ids, page_param
+from ..services.query import escape_like, favorite_ids, feed_loader_options, page_param
 from ..services.reports import delete_reports_for
 from ..services.uploads import UploadError, delete_upload, save_avatar
 
@@ -58,7 +58,7 @@ def profile(user_id):
     query = select(Material).where(Material.author_id == user.id)
     if not (current_user.id == user.id or current_user.is_admin):
         query = query.where(Material.is_hidden.is_(False))
-    query = query.order_by(Material.created_at.desc(), Material.id.desc())
+    query = query.order_by(Material.created_at.desc(), Material.id.desc()).options(*feed_loader_options())
     pagination = db.paginate(query, page=_page(), per_page=PROFILE_PER_PAGE, error_out=False)
     return render_template(
         "users/profile.html", profile_user=user, pagination=pagination, page=pagination.page,

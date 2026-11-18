@@ -4,7 +4,7 @@
     <div class="col">{% include "partials/material_card.html" %}</div>
     {% endfor %}
 </div>
-{% include "partials/pagination.html" %}
+{% with htmx_target="#material-list" %}{% include "partials/pagination.html" %}{% endwith %}
 {% else %}
 <div class="text-center text-secondary py-5">
     <i class="bi bi-inbox fs-1" aria-hidden="true"></i>
