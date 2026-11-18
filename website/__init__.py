@@ -107,10 +107,15 @@ def create_app(test_config=None):
 
     # No se crean usuarios por defecto. El primer administrador se crea con:
     #   flask --app main create-admin
-    from .commands import create_admin_command, reindex_search_command
+    from .commands import (
+        create_admin_command,
+        purge_data_command,
+        reindex_search_command,
+    )
 
     app.cli.add_command(create_admin_command)
     app.cli.add_command(reindex_search_command)
+    app.cli.add_command(purge_data_command)
 
     from .filters import register_filters
 

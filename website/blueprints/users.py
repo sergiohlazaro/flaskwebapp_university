@@ -25,11 +25,13 @@ from ..forms import (
     ProfileForm,
 )
 from ..models import (
+    AuthThrottle,
     Comment,
     Favorite,
     LoginRecord,
     Material,
     Message,
+    Notification,
     Rating,
     Report,
     User,
@@ -37,6 +39,7 @@ from ..models import (
 from ..services.mail import send_email
 from ..services.query import escape_like, favorite_ids, feed_loader_options, page_param
 from ..services.reports import delete_reports_for
+from ..services.search import remove_material
 from ..services.tokens import bump_session_version, make_verify_token
 from ..services.uploads import UploadError, delete_upload, save_avatar
 
@@ -244,6 +247,12 @@ def _delete_user_data(user):
         db.session.delete(material)  # cascada: ficheros, valoraciones, favoritos y comentarios
     db.session.flush()
     db.session.execute(delete(LoginRecord).where(LoginRecord.user_id == uid))
+    # Índice de búsqueda (los borrados por ORM ya lo limpian; esto cubre cualquier resto), avisos
+    # recibidos (los suyos como actor pasan a NULL por la FK) y el contador de intentos de su email.
+    for material_id in material_ids:
+        remove_material(material_id)
+    db.session.execute(delete(Notification).where(Notification.user_id == uid))
+    db.session.execute(delete(AuthThrottle).where(AuthThrottle.key == f"acct:{user.email.strip().lower()}"))
 
     db.session.execute(update(Message).where(Message.sender_id == uid).values(sender_id=None))
     db.session.execute(update(Message).where(Message.receiver_id == uid).values(receiver_id=None))
