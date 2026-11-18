@@ -1,6 +1,16 @@
 """Perfil público, «Mi cuenta» y directorio de usuarios (spec §5.7)."""
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import current_user, login_required, logout_user
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+from flask_login import current_user, login_required, login_user, logout_user
+from flask_login.config import COOKIE_NAME as REMEMBER_COOKIE_NAME
 from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -26,6 +36,7 @@ from ..models import (
 )
 from ..services.query import escape_like, favorite_ids, feed_loader_options, page_param
 from ..services.reports import delete_reports_for
+from ..services.tokens import bump_session_version
 from ..services.uploads import UploadError, delete_upload, save_avatar
 
 users = Blueprint("users", __name__)
@@ -188,7 +199,12 @@ def update_password():
         else:
             current_user.password = generate_password_hash(form.new_password.data)
             db.session.commit()
-            flash("Contraseña actualizada.", "success")
+            bump_session_version(current_user)
+            # El cliente actual sigue dentro con el id nuevo; conserva su "Recordarme" si lo usaba
+            # (la cookie remember solo existe en el navegador si se marcó al iniciar sesión).
+            remembered = current_app.config.get("REMEMBER_COOKIE_NAME", REMEMBER_COOKIE_NAME) in request.cookies
+            login_user(current_user._get_current_object(), remember=remembered)
+            flash("Contraseña cambiada. Se ha cerrado la sesión en tus otros dispositivos.", "success")
             return redirect(url_for("users.account"))
     return _render_account(password_form=form)
 

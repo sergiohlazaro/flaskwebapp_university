@@ -63,9 +63,15 @@ def create_app(test_config=None):
 
     @login_manager.user_loader
     def load_user(id):
-        user = db.session.get(User, int(id))
+        # SEC-11: solo "<id>:<versión>"; el formato antiguo ("<id>") y versiones viejas se rechazan.
+        uid, sep, version = str(id).partition(":")
+        if not (sep and uid.isascii() and uid.isdigit() and version.isascii() and version.isdigit()):
+            return None
+        user = db.session.get(User, int(uid))
         # SEC-07: un usuario bloqueado pierde la sesión en la siguiente petición.
-        return None if user is None or user.is_blocked else user
+        if user is None or user.is_blocked or (user.session_version or 0) != int(version):
+            return None
+        return user
 
     from werkzeug.routing import IntegerConverter
 

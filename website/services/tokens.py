@@ -60,3 +60,9 @@ def load_verify_token(token):
         return None
     user = db.session.get(User, data["id"])
     return None if user is None else (user, data["email"])
+
+
+def bump_session_version(user) -> None:
+    """Invalida todas las sesiones y cookies "remember" del usuario (y sus tokens de reset)."""
+    user.session_version = (user.session_version or 0) + 1
+    db.session.commit()

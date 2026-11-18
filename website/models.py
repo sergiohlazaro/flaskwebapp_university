@@ -66,6 +66,8 @@ class User(UserMixin, db.Model):
     role = db.Column(db.Integer, nullable=False, default=1)
     is_teacher = db.Column(db.Boolean, nullable=False, default=False)
     is_blocked = db.Column(db.Boolean, nullable=False, default=False)
+    # SEC-11: sube al cambiar la contraseña; invalida sesiones y cookies "remember" anteriores.
+    session_version = db.Column(db.Integer, nullable=False, default=0, server_default="0")
     # None = usar el avatar por defecto
     avatar = db.Column(db.String(150), nullable=True, default=None)
     twitter = db.Column(db.String(255), nullable=True)
@@ -73,6 +75,9 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
 
     login_records = db.relationship('LoginRecord')
+
+    def get_id(self) -> str:
+        return f"{self.id}:{self.session_version or 0}"
 
     @property
     def display_name(self) -> str:

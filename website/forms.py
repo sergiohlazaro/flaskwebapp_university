@@ -30,6 +30,7 @@ class LoginForm(FlaskForm):
     # Sin validador Email: el login debe responder igual ante cualquier credencial errónea.
     email = StringField("Email", filters=[_strip_lower], validators=[DataRequired(REQUIRED)])
     password = PasswordField("Contraseña", validators=[DataRequired(REQUIRED)])
+    remember = BooleanField("Recordarme", default=False)
 
 
 class SignupForm(FlaskForm):

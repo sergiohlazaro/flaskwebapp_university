@@ -73,8 +73,11 @@ def make_user(email, role=1, name="Test", surname="User", is_teacher=False):
     return user
 
 
-def login(client, email, password=PASSWORD):
-    return client.post("/login", data={"email": email, "password": password}, follow_redirects=True)
+def login(client, email, password=PASSWORD, remember=False):
+    data = {"email": email, "password": password}
+    if remember:
+        data["remember"] = "y"
+    return client.post("/login", data=data, follow_redirects=True)
 
 
 def png_bytes(size=(10, 10), color="red"):

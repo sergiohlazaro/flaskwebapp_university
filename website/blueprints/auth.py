@@ -83,7 +83,7 @@ def login():
             flash(GENERIC_LOGIN_ERROR, category='error')
             _register_failure(ip_address)
         else:
-            login_user(user, remember=True)
+            login_user(user, remember=form.remember.data)
             db.session.add(LoginRecord(user_id=user.id, ip_address=ip_address))
             db.session.commit()
             FAILED_LOGINS[ip_address] = [0, 0]
@@ -118,7 +118,7 @@ def signup():
             form.email.errors = list(form.email.errors) + ["Ya existe una cuenta con ese email."]
             return render_template("auth/signup.html", form=form)
 
-        login_user(new_user, remember=True)
+        login_user(new_user, remember=False)
         db.session.add(LoginRecord(user_id=new_user.id, ip_address=request.remote_addr))
         db.session.commit()
 

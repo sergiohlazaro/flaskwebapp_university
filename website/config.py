@@ -1,6 +1,7 @@
 """Configuración por entorno: development, testing y production."""
 
 import os
+from datetime import timedelta
 
 MAIL_BACKEND = os.environ.get("MAIL_BACKEND", "log")
 
@@ -19,6 +20,7 @@ class BaseConfig:
     SESSION_COOKIE_SECURE = False
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_DURATION = timedelta(days=30)
     REMEMBER_COOKIE_SECURE = False
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_SAMESITE = "Lax"
