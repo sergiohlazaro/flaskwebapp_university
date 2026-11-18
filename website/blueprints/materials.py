@@ -34,6 +34,7 @@ from ..models import (
     Subject,
     User,
 )
+from ..services.notifications import notify_comment, notify_new_report
 from ..services.permissions import can_view_material
 from ..services.query import (
     escape_like,
@@ -251,7 +252,10 @@ def add_comment(material_id):
         abort(404)
     form = CommentForm()
     if form.validate_on_submit():
-        db.session.add(Comment(material_id=material.id, author_id=current_user.id, body=form.body.data))
+        comment = Comment(material_id=material.id, author_id=current_user.id, body=form.body.data)
+        db.session.add(comment)
+        db.session.flush()
+        notify_comment(comment)
         db.session.commit()
         return _comments_response(material)
     if request.headers.get("HX-Request"):
@@ -341,8 +345,10 @@ def report():
                                      status=ReportStatus.PENDING).first()
     if pending is not None:
         return _report_reply(REPORTED_MSG, "info", 200, anchor=anchor)
-    db.session.add(Report(reporter_id=current_user.id, target_type=kind, target_id=target_id,
-                          reason=ReportReason(form.reason.data), details=form.details.data or ""))
+    new_report = Report(reporter_id=current_user.id, target_type=kind, target_id=target_id,
+                        reason=ReportReason(form.reason.data), details=form.details.data or "")
+    db.session.add(new_report)
+    notify_new_report(new_report)
     db.session.commit()
     return _report_reply(THANKS_MSG, "success", 200, anchor=anchor)
 

@@ -226,3 +226,23 @@ class AuthThrottle(db.Model):
     first_failure_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
     locked_until = db.Column(db.DateTime(timezone=True), nullable=True)
     updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class Notification(db.Model):
+    """Aviso en la aplicación (spec §5.8); ver services/notifications.py."""
+    __table_args__ = (db.Index("ix_notification_user_created", "user_id", "created_at"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    # comment_on_material, reply_in_thread, content_hidden, new_report
+    kind = db.Column(db.String(30), nullable=False)
+    actor_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
+    material_id = db.Column(db.Integer, db.ForeignKey("material.id", ondelete="CASCADE"), nullable=True)
+    comment_id = db.Column(db.Integer, db.ForeignKey("comment.id", ondelete="CASCADE"), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    read_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+    actor = db.relationship("User", foreign_keys=[actor_id])
+    material = db.relationship("Material")
+    comment = db.relationship("Comment")

@@ -28,6 +28,7 @@ from ..models import (
     User,
     utcnow,
 )
+from ..services.notifications import notify_hidden
 from ..services.permissions import admin_required
 from ..services.query import escape_like, page_param
 from ..services.reports import resolve_pending_reports
@@ -235,6 +236,7 @@ def resolve_report(report_id):
     target = _target(report)
     if target is None:
         abort(400)
+    notify_hidden(report.target_type, target, current_user)
     target.is_hidden = True
     resolve_pending_reports(report.target_type, report.target_id, current_user.id)
     db.session.commit()
@@ -280,6 +282,7 @@ def hide(target_type, target_id):
     kind = {"material": ReportTarget.MATERIAL, "comment": ReportTarget.COMMENT}.get(target_type) or abort(404)
     model = Material if kind is ReportTarget.MATERIAL else Comment
     item = db.session.get(model, target_id) or abort(404)
+    notify_hidden(kind, item, current_user)
     item.is_hidden = True
     resolve_pending_reports(kind, item.id, current_user.id)
     db.session.commit()

@@ -89,6 +89,7 @@ def create_app(test_config=None):
     from .blueprints.main import main
     from .blueprints.materials import materials
     from .blueprints.messages import messages
+    from .blueprints.notifications import notifications
     from .blueprints.users import users
 
     app.register_blueprint(auth, url_prefix="/")
@@ -97,6 +98,7 @@ def create_app(test_config=None):
     app.register_blueprint(admin)
     app.register_blueprint(materials)
     app.register_blueprint(messages)
+    app.register_blueprint(notifications)
     app.register_blueprint(users)
 
     # No se crean usuarios por defecto. El primer administrador se crea con:
@@ -124,15 +126,18 @@ def create_app(test_config=None):
     @app.context_processor
     def inject_globals():
         from .models import Message
+        from .services.notifications import unread_count
 
-        unread = 0
+        unread = unread_notifications = 0
         if current_user.is_authenticated:
+            unread_notifications = unread_count(current_user)
             unread = db.session.scalar(
                 select(func.count(Message.id)).where(Message.receiver_id == current_user.id,
                                                      Message.read_at.is_(None))) or 0
         from .blueprints.admin import EXCERPT_LEN
 
         return {"app_name": app.config["APP_NAME"], "unread_messages_count": unread,
+                "unread_notifications_count": unread_notifications,
                 "current_year": datetime.now(UTC).year, "EXCERPT_LEN": EXCERPT_LEN}
 
     @login_manager.unauthorized_handler

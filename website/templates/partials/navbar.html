@@ -27,6 +27,15 @@
                         {% endif %}
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link position-relative" href="{{ url_for('notifications.index') }}"
+                       aria-label="Notificaciones ({{ unread_notifications_count }} sin leer)">
+                        <i class="bi bi-bell" aria-hidden="true"></i>
+                        {% if unread_notifications_count %}
+                        <span class="badge rounded-pill text-bg-danger" aria-hidden="true">{{ "9+" if unread_notifications_count > 9 else unread_notifications_count }}</span>
+                        {% endif %}
+                    </a>
+                </li>
                 <li class="nav-item"><a class="nav-link" href="{{ url_for('materials.saved') }}"><i class="bi bi-star" aria-hidden="true"></i> Guardados</a></li>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button"
