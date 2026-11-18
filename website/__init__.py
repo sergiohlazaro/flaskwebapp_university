@@ -9,7 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import get_config
 from .extensions import csrf, db, limiter, login_manager, migrate
-from .services.query import MAX_INT
+from .services.query import MAX_INT, login_next_target
 
 __all__ = ["create_app", "db"]
 
@@ -102,6 +102,10 @@ def create_app(test_config=None):
 
     register_filters(app)
 
+    from .errors import register_error_handlers
+
+    register_error_handlers(app)
+
     from .services.headers import register_security_headers
 
     register_security_headers(app)
@@ -120,7 +124,8 @@ def create_app(test_config=None):
     @login_manager.unauthorized_handler
     def unauthorized():
         # Peticiones htmx: 401 + HX-Redirect para no incrustar el login en un fragmento.
-        target = url_for("auth.login", next=request.full_path.rstrip("?"))
+        # `next` solo si se puede volver con GET (no a rutas solo-POST).
+        target = url_for("auth.login", next=login_next_target())
         if request.headers.get("HX-Request"):
             return Response("", status=401, headers={"HX-Redirect": target})
         return redirect(target)

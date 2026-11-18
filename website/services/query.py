@@ -1,4 +1,7 @@
 """Utilidades compartidas por los blueprints para leer parámetros y construir consultas."""
+from urllib.parse import urlsplit
+
+from flask import request
 from flask_login import current_user
 from sqlalchemy import select
 
@@ -36,3 +39,32 @@ def favorite_ids(items):
     rows = db.session.scalars(select(Favorite.material_id).where(
         Favorite.user_id == current_user.id, Favorite.material_id.in_(ids)))
     return set(rows)
+
+
+def internal_path(url):
+    """Ruta (con consulta) de una URL de este mismo sitio, o None si es externa o dudosa."""
+    if not url or "\\" in url:
+        return None
+    parts = urlsplit(url)
+    if (parts.scheme or parts.netloc) and (parts.scheme not in ("http", "https") or parts.netloc != request.host):
+        return None
+    if not parts.path.startswith("/") or parts.path.startswith("//"):
+        return None
+    return parts.path + (f"?{parts.query}" if parts.query else "")
+
+
+def login_next_target():
+    """Destino al que volver tras iniciar sesión: solo URLs que se puedan abrir con GET.
+
+    GET: la propia URL. htmx: la página actual (HX-Current-URL), no el fragmento pedido.
+    Otros métodos (POST...): el referrer interno, o nada (la URL es solo-POST).
+    """
+    if request.headers.get("HX-Request"):
+        current = internal_path(request.headers.get("HX-Current-URL"))
+        if current:
+            return current
+    elif request.method not in ("GET", "HEAD"):
+        return internal_path(request.referrer)
+    if request.method in ("GET", "HEAD"):
+        return request.full_path.rstrip("?")
+    return None
