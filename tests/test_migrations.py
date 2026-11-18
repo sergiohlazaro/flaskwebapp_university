@@ -5,6 +5,7 @@ from conftest import PASSWORD, make_user
 from sqlalchemy import inspect
 
 from website import create_app, db
+from website.services.search import ensure_search_index
 
 EXPECTED_TABLES = {
     "user", "login_record", "subject", "material", "material_file", "rating", "comment",
@@ -43,6 +44,7 @@ def test_csrf_enforced_on_admin_and_material_posts(tmp_path):
     # contexto compartido entre clientes mezclaría los tokens de ambas sesiones.
     with app.app_context():
         db.create_all()
+        ensure_search_index()
         make_user("admin@example.com", role=0)
         make_user("user@example.com")
     admin = app.test_client()
@@ -92,3 +94,28 @@ def test_autoincrement_migration_keeps_data_and_stops_id_reuse(tmp_path):
             conn.execute(text("INSERT INTO comment (material_id, author_id, body, created_at, is_hidden) "
                               "VALUES (1, 1, 'n', '2026-01-01', 0)"))
             assert conn.execute(text("SELECT id FROM comment")).scalar() == 2
+
+
+def test_fts_migration_backfills_and_downgrades(tmp_path):
+    from flask_migrate import downgrade, upgrade
+    from sqlalchemy import text
+    app = _tmp_app(tmp_path)
+    with app.app_context():
+        upgrade(revision="94a33e68980f")
+        for sql in (
+            ("INSERT INTO user (name, surname, email, password, role, is_teacher, is_blocked, session_version, "
+             "created_at) VALUES ('Ana', 'García', 'a@uni.es', 'x', 1, 0, 0, 0, '2026-01-01')"),
+            "INSERT INTO subject (name, name_key, is_archived) VALUES ('Redes', 'redes', 0)",
+            ("INSERT INTO material (title, description, subject_id, author_id, created_at, updated_at, is_hidden) "
+             "VALUES ('Apuntes', 'sobre grafos', 1, 1, '2026-01-01', '2026-01-01', 0)"),
+        ):
+            db.session.execute(text(sql))
+        db.session.commit()
+        upgrade()
+        row = db.session.execute(text("SELECT rowid, title, description, subject_name, author_name "
+                                      "FROM material_fts")).one()
+        assert tuple(row) == (1, "Apuntes", "sobre grafos", "Redes", "Ana García")
+        downgrade(revision="94a33e68980f")
+        left = db.session.execute(text("SELECT name FROM sqlite_master WHERE name LIKE 'material_fts%'")).all()
+        db.session.remove()
+    assert left == []

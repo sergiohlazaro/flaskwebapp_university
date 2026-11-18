@@ -1,5 +1,5 @@
 {# Uso: include con `material`, `my_stars` (0 si no ha votado) y `can_rate`. #}
-<div id="rating-block" class="rating-block">
+<div id="rating-block" class="rating-block" aria-live="polite">
     <p class="mb-1">
         <i class="bi bi-star-fill rating-star" aria-hidden="true"></i>
         {% if material.average_rating is not none %}

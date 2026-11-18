@@ -5,7 +5,9 @@ from sqlalchemy import func
 from werkzeug.security import generate_password_hash
 
 from .extensions import db
-from .models import User
+from .models import User, utcnow
+from .services.retention import purge_expired
+from .services.search import reindex_all
 
 MIN_PASSWORD_LENGTH = 8
 MAX_EMAIL_LENGTH = 100  # tamaño de la columna user.email
@@ -37,7 +39,24 @@ def create_admin_command(email, name, surname, password):
         password=generate_password_hash(password),
         role=0,
         is_blocked=False,
+        email_verified_at=utcnow(),
     )
     db.session.add(admin)
     db.session.commit()
     click.echo(f"Admin {email} created.")
+
+
+@click.command("reindex-search")
+def reindex_search_command():
+    """Reconstruye el índice de búsqueda de texto completo."""
+    count = reindex_all()
+    db.session.commit()
+    click.echo(f"Reindexed {count} materials.")
+
+
+@click.command("purge-data")
+def purge_data_command():
+    """Borra los datos caducados según la política de retención."""
+    result = purge_expired()
+    click.echo(f"Registros de acceso: {result['login_records']} · Notificaciones: {result['notifications']}"
+               f" · Intentos: {result['throttle']}")

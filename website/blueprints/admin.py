@@ -1,6 +1,16 @@
 """Panel de administración: usuarios, asignaturas, reportes y contenido oculto (spec §5.2, §5.6, §5.9)."""
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -19,9 +29,11 @@ from ..models import (
     User,
     utcnow,
 )
+from ..services.notifications import notify_hidden
 from ..services.permissions import admin_required
 from ..services.query import escape_like, page_param
 from ..services.reports import resolve_pending_reports
+from ..services.tokens import make_reset_token
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -113,6 +125,18 @@ def unblock(user_id):
     return redirect(url_for("admin.users"))
 
 
+@admin.route("/usuarios/<int:user_id>/verificar", methods=["POST"])
+@login_required
+@admin_required
+def mark_verified(user_id):
+    user = _user_or_404(user_id)
+    if user.email_verified_at is None:
+        user.email_verified_at = utcnow()
+        db.session.commit()
+    flash("Usuario marcado como verificado.", "success")
+    return redirect(url_for("admin.users"))
+
+
 @admin.route("/usuarios/<int:user_id>/profesor", methods=["POST"])
 @login_required
 @admin_required
@@ -122,6 +146,22 @@ def toggle_teacher(user_id):
     db.session.commit()
     flash("Marcado como profesor/a." if user.is_teacher else "Ya no figura como profesor/a.", "success")
     return redirect(url_for("admin.users"))
+
+
+@admin.route("/usuarios/<int:user_id>/enlace-recuperacion", methods=["POST"])
+@login_required
+@admin_required
+def reset_link(user_id):
+    user = _user_or_404(user_id)
+    if user.is_admin:
+        flash("No se puede generar un enlace de recuperación para otro administrador.", "error")
+        return users(), 400
+    link = url_for("auth.reset_password", token=make_reset_token(user), _external=True)
+    # Sin el token en el log general.
+    current_app.logger.info(f"admin {current_user.id} generó un enlace de recuperación para el usuario {user.id}")
+    response = make_response(render_template("admin/reset_link.html", target=user, link=link, active_tab="users"))
+    response.headers["Cache-Control"] = "no-store"  # el enlace es una credencial
+    return response
 
 
 @admin.route("/usuarios/<int:user_id>/accesos")
@@ -199,6 +239,7 @@ def resolve_report(report_id):
     target = _target(report)
     if target is None:
         abort(400)
+    notify_hidden(report.target_type, target, current_user)
     target.is_hidden = True
     resolve_pending_reports(report.target_type, report.target_id, current_user.id)
     db.session.commit()
@@ -244,6 +285,7 @@ def hide(target_type, target_id):
     kind = {"material": ReportTarget.MATERIAL, "comment": ReportTarget.COMMENT}.get(target_type) or abort(404)
     model = Material if kind is ReportTarget.MATERIAL else Comment
     item = db.session.get(model, target_id) or abort(404)
+    notify_hidden(kind, item, current_user)
     item.is_hidden = True
     resolve_pending_reports(kind, item.id, current_user.id)
     db.session.commit()

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Activar cuenta · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card"><div class="card-body p-4">
+            <h1 class="h3 text-center mb-3">Activar cuenta</h1>
+            <p class="text-secondary">Escribe el email de tu cuenta y, si está pendiente de activar, te enviaremos un nuevo enlace de activación.</p>
+            <form method="post" action="{{ url_for('auth.resend_verification') }}" novalidate>
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.email.label(class="form-label") }}
+                    {{ form.email(class="form-control" ~ (" is-invalid" if form.email.errors else ""), type="email", autocomplete="email", placeholder="tu@correo.es") }}
+                    {% for e in form.email.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Reenviar enlace</button>
+            </form>
+            <p class="text-center mt-3 mb-0"><a href="{{ url_for('auth.login') }}">Volver a iniciar sesión</a></p>
+        </div></div>
+    </div>
+</div>
+{% endblock %}

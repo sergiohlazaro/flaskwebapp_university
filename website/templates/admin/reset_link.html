@@ -1,0 +1,8 @@
+{% extends "admin/layout.html" %}
+{% block title %}Enlace de recuperación · {{ app_name }}{% endblock %}
+{% block admin_content %}
+<p><a href="{{ url_for('admin.users') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a usuarios</a></p>
+<h2 class="h5">Enlace de recuperación para {{ target.display_name }}</h2>
+<p class="text-secondary">Hazle llegar este enlace a la persona. Es de un solo uso y caduca en 1 hora. No se volverá a mostrar.</p>
+<input type="text" readonly class="form-control" value="{{ link }}" aria-label="Enlace de recuperación">
+{% endblock %}

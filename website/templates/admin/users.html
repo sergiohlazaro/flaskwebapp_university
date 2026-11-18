@@ -5,13 +5,13 @@
     <div class="col-sm-8 col-md-6">
         <input type="search" name="q" value="{{ q }}" maxlength="100" class="form-control" placeholder="Buscar por nombre o correo" aria-label="Buscar usuarios">
     </div>
-    <div class="col-auto"><button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Buscar</button></div>
+    <div class="col-auto"><button type="submit" class="btn btn-primary"><i class="bi bi-search" aria-hidden="true"></i> Buscar</button></div>
 </form>
 {% if rows %}
 <div class="table-responsive">
 <table class="table align-middle">
     <thead>
-        <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Profesor/a</th><th>Estado</th><th>Último acceso</th><th class="text-end">Acciones</th></tr>
+        <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Profesor/a</th><th>Estado</th><th>Verificado</th><th>Último acceso</th><th class="text-end">Acciones</th></tr>
     </thead>
     <tbody>
     {% for user, last_login in rows %}
@@ -26,11 +26,24 @@
                 </form>
             </td>
             <td>{% if user.is_blocked %}<span class="badge text-bg-danger">Bloqueado</span>{% else %}<span class="badge text-bg-success">Activo</span>{% endif %}</td>
+            <td>{% if user.email_verified_at %}<span class="badge text-bg-success">Sí</span>{% else %}<span class="badge text-bg-warning">No</span>{% endif %}</td>
             <td>{{ last_login|localtime if last_login else "—" }}</td>
             <td class="text-end">
                 <div class="d-flex gap-2 justify-content-end">
                     <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.user_logins', user_id=user.id) }}">Accesos</a>
+                    {% if not user.email_verified_at %}
+                    <form method="post" action="{{ url_for('admin.mark_verified', user_id=user.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">Marcar como verificado</button>
+                    </form>
+                    {% endif %}
                     {% if user.id != current_user.id %}
+                    {% if not user.is_admin %}
+                    <form method="post" action="{{ url_for('admin.reset_link', user_id=user.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">Generar enlace de recuperación</button>
+                    </form>
+                    {% endif %}
                     {% if user.is_blocked %}
                     <form method="post" action="{{ url_for('admin.unblock', user_id=user.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

@@ -5,6 +5,7 @@ from conftest import make_user
 
 from website import db
 from website.models import User
+from website.services.search import ensure_search_index
 
 # ---------------------------------------------------------------------------
 # QA-02: los tests no deben tocar la base de datos real
@@ -19,6 +20,7 @@ def test_qa02_create_app_uses_config_passed_before_init(tmp_path):
     with app.app_context():
         assert db.engine.url.database == str(db_file)
         db.create_all()
+        ensure_search_index()
         assert User.query.count() == 0  # sin usuarios sembrados en modo test
 
 
@@ -53,6 +55,7 @@ def test_sec02_session_forged_with_leaked_key_is_rejected(monkeypatch):
     app = create_app(TEST_DB)
     with app.app_context():
         db.create_all()
+        ensure_search_index()
         admin = make_user("admin@example.com", role=0)
         client = app.test_client()
         client.set_cookie("session", _forge_session_cookie(app, admin.id, LEAKED_KEY))
@@ -82,6 +85,7 @@ def test_sec03_app_start_does_not_seed_default_accounts(tmp_path):
 
     with app.app_context():
         db.create_all()
+        ensure_search_index()
         assert User.query.count() == 0
 
 

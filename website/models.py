@@ -66,6 +66,11 @@ class User(UserMixin, db.Model):
     role = db.Column(db.Integer, nullable=False, default=1)
     is_teacher = db.Column(db.Boolean, nullable=False, default=False)
     is_blocked = db.Column(db.Boolean, nullable=False, default=False)
+    # SEC-11: sube al cambiar la contraseña; invalida sesiones y cookies "remember" anteriores.
+    session_version = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    # SEC-09: None = email sin verificar. pending_email = cambio de email a la espera de verificar.
+    email_verified_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    pending_email = db.Column(db.String(100), nullable=True)
     # None = usar el avatar por defecto
     avatar = db.Column(db.String(150), nullable=True, default=None)
     twitter = db.Column(db.String(255), nullable=True)
@@ -73,6 +78,9 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
 
     login_records = db.relationship('LoginRecord')
+
+    def get_id(self) -> str:
+        return f"{self.id}:{self.session_version or 0}"
 
     @property
     def display_name(self) -> str:
@@ -88,7 +96,7 @@ class Subject(db.Model):
     name = db.Column(db.String(120), nullable=False)
     # Clave normalizada (casefold) para unicidad sin distinguir mayúsculas,
     # también con letras no ASCII (lower() de SQLite no las pliega).
-    name_key = db.Column(db.String(120), nullable=False, unique=True)
+    name_key = db.Column(db.String(200), nullable=False, unique=True)
     is_archived = db.Column(db.Boolean, nullable=False, default=False)
 
     @validates("name")
@@ -208,3 +216,33 @@ class Message(db.Model):
 
     sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
     receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
+
+
+class AuthThrottle(db.Model):
+    """Fallos de login por clave (`ip:<addr>` o `acct:<email>`); ver services/throttle.py."""
+    __tablename__ = "auth_throttle"
+    key = db.Column(db.String(320), primary_key=True)
+    failures = db.Column(db.Integer, nullable=False, default=0)
+    first_failure_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    locked_until = db.Column(db.DateTime(timezone=True), nullable=True)
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class Notification(db.Model):
+    """Aviso en la aplicación (spec §5.8); ver services/notifications.py."""
+    __table_args__ = (db.Index("ix_notification_user_created", "user_id", "created_at"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    # comment_on_material, reply_in_thread, content_hidden, new_report
+    kind = db.Column(db.String(30), nullable=False)
+    actor_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
+    material_id = db.Column(db.Integer, db.ForeignKey("material.id", ondelete="CASCADE"), nullable=True)
+    comment_id = db.Column(db.Integer, db.ForeignKey("comment.id", ondelete="CASCADE"), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    read_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+    actor = db.relationship("User", foreign_keys=[actor_id])
+    material = db.relationship("Material")
+    comment = db.relationship("Comment")

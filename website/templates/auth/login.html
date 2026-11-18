@@ -17,9 +17,15 @@
                     {{ form.password(class="form-control" ~ (" is-invalid" if form.password.errors else ""), autocomplete="current-password") }}
                     {% for e in form.password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
                 </div>
+                <div class="form-check mb-3">
+                    {{ form.remember(class="form-check-input") }}
+                    {{ form.remember.label(class="form-check-label") }}
+                </div>
                 <button type="submit" class="btn btn-primary w-100">Iniciar sesión</button>
             </form>
-            <p class="text-center mt-3 mb-0"><a href="{{ url_for('auth.signup') }}">¿No tienes cuenta? Regístrate</a></p>
+            {% if show_resend %}<p class="text-center mt-3 mb-1"><a href="{{ url_for('auth.resend_verification') }}">Pedir un nuevo enlace de activación</a></p>{% endif %}
+            <p class="text-center mt-3 mb-1"><a href="{{ url_for('auth.forgot_password') }}">¿Has olvidado tu contraseña?</a></p>
+            <p class="text-center mb-0"><a href="{{ url_for('auth.signup') }}">¿No tienes cuenta? Regístrate</a></p>
         </div></div>
     </div>
 </div>

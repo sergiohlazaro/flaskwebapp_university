@@ -4,12 +4,19 @@ from urllib.parse import urlsplit
 from flask import request
 from flask_login import current_user
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from ..extensions import db
-from ..models import Favorite
+from ..models import Favorite, Material
 
 MAX_INT = 2**63 - 1  # rango de INTEGER en SQLite
 MAX_PAGE = 1_000_000
+
+
+def feed_loader_options():
+    """Opciones de carga anticipada para las tarjetas de material (evita N+1 en feeds y perfiles)."""
+    return [selectinload(Material.subject), selectinload(Material.author),
+            selectinload(Material.files), selectinload(Material.ratings)]
 
 
 def escape_like(text):

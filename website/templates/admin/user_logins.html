@@ -1,7 +1,7 @@
 {% extends "admin/layout.html" %}
 {% block title %}Accesos · {{ app_name }}{% endblock %}
 {% block admin_content %}
-<p><a href="{{ url_for('admin.users') }}"><i class="bi bi-arrow-left"></i> Volver a usuarios</a></p>
+<p><a href="{{ url_for('admin.users') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a usuarios</a></p>
 <h2 class="h5">Accesos de {{ target.display_name }}</h2>
 {% if records %}
 <table class="table">

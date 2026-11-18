@@ -1,7 +1,18 @@
 """Perfil público, «Mi cuenta» y directorio de usuarios (spec §5.7)."""
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import current_user, login_required, logout_user
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+from flask_login import current_user, login_required, login_user, logout_user
+from flask_login.config import COOKIE_NAME as REMEMBER_COOKIE_NAME
 from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..extensions import db, limiter
@@ -14,17 +25,22 @@ from ..forms import (
     ProfileForm,
 )
 from ..models import (
+    AuthThrottle,
     Comment,
     Favorite,
     LoginRecord,
     Material,
     Message,
+    Notification,
     Rating,
     Report,
     User,
 )
-from ..services.query import escape_like, favorite_ids, page_param
+from ..services.mail import send_email
+from ..services.query import escape_like, favorite_ids, feed_loader_options, page_param
 from ..services.reports import delete_reports_for
+from ..services.search import remove_material
+from ..services.tokens import bump_session_version, make_verify_token
 from ..services.uploads import UploadError, delete_upload, save_avatar
 
 users = Blueprint("users", __name__)
@@ -58,7 +74,7 @@ def profile(user_id):
     query = select(Material).where(Material.author_id == user.id)
     if not (current_user.id == user.id or current_user.is_admin):
         query = query.where(Material.is_hidden.is_(False))
-    query = query.order_by(Material.created_at.desc(), Material.id.desc())
+    query = query.order_by(Material.created_at.desc(), Material.id.desc()).options(*feed_loader_options())
     pagination = db.paginate(query, page=_page(), per_page=PROFILE_PER_PAGE, error_out=False)
     return render_template(
         "users/profile.html", profile_user=user, pagination=pagination, page=pagination.page,
@@ -143,6 +159,13 @@ def update_avatar():
     return redirect(url_for("users.account"))
 
 
+DUPLICATE_EMAIL = "Ya existe una cuenta con ese email."
+
+
+def _email_taken(email):
+    return db.session.scalar(select(User.id).where(User.email == email)) is not None
+
+
 @users.route("/cuenta/email", methods=["POST"])
 @limiter.limit("10 per minute")
 @login_required
@@ -153,13 +176,39 @@ def update_email():
             form.current_password.errors = [WRONG_PASSWORD]
         elif form.new_email.data == current_user.email:
             form.new_email.errors = ["Ese ya es tu email."]
-        elif db.session.scalar(select(User.id).where(User.email == form.new_email.data)):
-            form.new_email.errors = ["Ya existe una cuenta con ese email."]
+        elif current_app.config["REQUIRE_EMAIL_VERIFICATION"]:
+            # El email no cambia hasta verificar la nueva dirección. Misma respuesta si la dirección
+            # ya es de otra cuenta (sin enumeración): solo su dueño recibe un aviso.
+            new_email = form.new_email.data
+            # La dirección pedida consta como pendiente en ambos casos (la cuenta se ve igual); solo si
+            # está libre se emite un token. Si está ocupada no existe ninguno que pueda aplicarla.
+            current_user.pending_email = new_email
+            db.session.commit()
+            if _email_taken(new_email):
+                owner = User.query.filter_by(email=new_email).first()
+                send_email(owner.email, "Intento de uso de tu email", "email/email_change_taken.txt",
+                           name=owner.name, link=url_for("auth.forgot_password", _external=True))
+            else:
+                link = url_for("auth.verify_email", _external=True,
+                               token=make_verify_token(current_user, new_email))
+                send_email(new_email, "Confirma tu nuevo email", "email/email_verify.txt",
+                           name=current_user.name, link=link)
+            flash(f"Te hemos enviado un enlace a {new_email} para confirmarlo. "
+                  "Tu email no cambia hasta entonces.", "success")
+            return redirect(url_for("users.account"))
+        elif _email_taken(form.new_email.data):
+            form.new_email.errors = [DUPLICATE_EMAIL]
         else:
             current_user.email = form.new_email.data
-            db.session.commit()
-            flash("Email actualizado.", "success")
-            return redirect(url_for("users.account"))
+            try:
+                db.session.commit()
+            except IntegrityError:
+                # Carrera: el email lo ocupó otra cuenta tras la comprobación previa.
+                db.session.rollback()
+                form.new_email.errors = [DUPLICATE_EMAIL]
+            else:
+                flash("Email actualizado.", "success")
+                return redirect(url_for("users.account"))
     return _render_account(email_form=form)
 
 
@@ -173,8 +222,12 @@ def update_password():
             form.current_password.errors = [WRONG_PASSWORD]
         else:
             current_user.password = generate_password_hash(form.new_password.data)
-            db.session.commit()
-            flash("Contraseña actualizada.", "success")
+            bump_session_version(current_user)  # un único commit: hash y versión juntos
+            # El cliente actual sigue dentro con el id nuevo; conserva su "Recordarme" si lo usaba
+            # (la cookie remember solo existe en el navegador si se marcó al iniciar sesión).
+            remembered = current_app.config.get("REMEMBER_COOKIE_NAME", REMEMBER_COOKIE_NAME) in request.cookies
+            login_user(current_user._get_current_object(), remember=remembered)
+            flash("Contraseña cambiada. Se ha cerrado la sesión en tus otros dispositivos.", "success")
             return redirect(url_for("users.account"))
     return _render_account(password_form=form)
 
@@ -203,6 +256,12 @@ def _delete_user_data(user):
         db.session.delete(material)  # cascada: ficheros, valoraciones, favoritos y comentarios
     db.session.flush()
     db.session.execute(delete(LoginRecord).where(LoginRecord.user_id == uid))
+    # Índice de búsqueda (los borrados por ORM ya lo limpian; esto cubre cualquier resto), avisos
+    # recibidos (los suyos como actor pasan a NULL por la FK) y el contador de intentos de su email.
+    for material_id in material_ids:
+        remove_material(material_id)
+    db.session.execute(delete(Notification).where(Notification.user_id == uid))
+    db.session.execute(delete(AuthThrottle).where(AuthThrottle.key == f"acct:{user.email.strip().lower()}"))
 
     db.session.execute(update(Message).where(Message.sender_id == uid).values(sender_id=None))
     db.session.execute(update(Message).where(Message.receiver_id == uid).values(receiver_id=None))

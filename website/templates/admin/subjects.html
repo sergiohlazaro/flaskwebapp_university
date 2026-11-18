@@ -9,7 +9,7 @@
             {{ form.name(class="form-control" ~ (" is-invalid" if form.name.errors else ""), maxlength=100, placeholder="Nombre de la asignatura", aria_label="Nombre de la asignatura") }}
             {% for e in form.name.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
         </div>
-        <div class="col-auto"><button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Crear</button></div>
+        <div class="col-auto"><button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg" aria-hidden="true"></i> Crear</button></div>
     </form>
 </div></div>
 

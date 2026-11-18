@@ -4,17 +4,17 @@
 <h1 class="h3 mb-3">Administración</h1>
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
-        <a class="nav-link{{ ' active' if active_tab == 'users' }}" href="{{ url_for('admin.users') }}"><i class="bi bi-people"></i> Usuarios</a>
+        <a class="nav-link{{ ' active' if active_tab == 'users' }}" href="{{ url_for('admin.users') }}"><i class="bi bi-people" aria-hidden="true"></i> Usuarios</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link{{ ' active' if active_tab == 'subjects' }}" href="{{ url_for('admin.subjects') }}"><i class="bi bi-journal-bookmark"></i> Asignaturas</a>
+        <a class="nav-link{{ ' active' if active_tab == 'subjects' }}" href="{{ url_for('admin.subjects') }}"><i class="bi bi-journal-bookmark" aria-hidden="true"></i> Asignaturas</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link{{ ' active' if active_tab == 'reports' }}" href="{{ url_for('admin.reports') }}"><i class="bi bi-flag"></i> Reportes
+        <a class="nav-link{{ ' active' if active_tab == 'reports' }}" href="{{ url_for('admin.reports') }}"><i class="bi bi-flag" aria-hidden="true"></i> Reportes
             <span class="badge text-bg-danger">{{ pending_reports_count }}</span></a>
     </li>
     <li class="nav-item">
-        <a class="nav-link{{ ' active' if active_tab == 'hidden' }}" href="{{ url_for('admin.hidden') }}"><i class="bi bi-eye-slash"></i> Contenido oculto</a>
+        <a class="nav-link{{ ' active' if active_tab == 'hidden' }}" href="{{ url_for('admin.hidden') }}"><i class="bi bi-eye-slash" aria-hidden="true"></i> Contenido oculto</a>
     </li>
 </ul>
 {% block admin_content %}{% endblock %}

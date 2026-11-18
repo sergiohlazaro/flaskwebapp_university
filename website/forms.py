@@ -27,9 +27,30 @@ def _strip(value):
 
 
 class LoginForm(FlaskForm):
-    # Sin validador Email: el login debe responder igual ante cualquier credencial errónea.
-    email = StringField("Email", filters=[_strip_lower], validators=[DataRequired(REQUIRED)])
+    # Sin validador Email: el login debe responder igual ante cualquier credencial errónea
+    # (un email desmesurado recibe el mismo mensaje genérico y no genera claves de throttle).
+    email = StringField("Email", filters=[_strip_lower], validators=[
+        DataRequired(REQUIRED),
+        Length(max=320, message="Email o contraseña incorrectos."),
+    ])
     password = PasswordField("Contraseña", validators=[DataRequired(REQUIRED)])
+    remember = BooleanField("Recordarme", default=False)
+
+
+class ForgotPasswordForm(FlaskForm):
+    # Los emails desmesurados no validan; las vistas responden igual que ante cualquier otro email.
+    email = StringField("Email", filters=[_strip_lower], validators=[DataRequired(REQUIRED), Length(max=320)])
+
+
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField("Nueva contraseña", validators=[
+        DataRequired(REQUIRED),
+        Length(min=8, message="La contraseña debe tener al menos 8 caracteres."),
+    ])
+    password2 = PasswordField("Repite la nueva contraseña", validators=[
+        DataRequired(REQUIRED),
+        EqualTo("password", message="Las contraseñas no coinciden."),
+    ])
 
 
 class SignupForm(FlaskForm):
@@ -56,7 +77,12 @@ class SignupForm(FlaskForm):
     ])
 
     def validate_email(self, field):
+        from flask import current_app
+
         from .models import User
+        # Con verificación activa el registro no revela si el email existe (lo gestiona la vista).
+        if current_app.config["REQUIRE_EMAIL_VERIFICATION"]:
+            return
         if User.query.filter_by(email=field.data).first():
             raise ValidationError("Ya existe una cuenta con ese email.")
 

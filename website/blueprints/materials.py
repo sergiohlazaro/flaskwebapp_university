@@ -13,7 +13,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, column, func, literal_column, select, table
 from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import BadRequest, NotFound
 
@@ -34,9 +34,16 @@ from ..models import (
     Subject,
     User,
 )
+from ..services.notifications import notify_comment, notify_new_report
 from ..services.permissions import can_view_material
-from ..services.query import escape_like, favorite_ids, int_param, page_param
+from ..services.query import (
+    favorite_ids,
+    feed_loader_options,
+    int_param,
+    page_param,
+)
 from ..services.reports import delete_reports_for
+from ..services.search import build_match
 from ..services.uploads import (
     ALLOWED_MATERIAL_EXTENSIONS,
     UploadError,
@@ -47,6 +54,7 @@ from ..services.uploads import (
 
 materials = Blueprint("materials", __name__)
 
+FTS = table("material_fts", column("rowid"), column("material_fts"))
 MAX_FILES = 5
 PER_PAGE = 12
 NO_FILES_MSG = "Sube al menos un fichero."
@@ -245,7 +253,10 @@ def add_comment(material_id):
         abort(404)
     form = CommentForm()
     if form.validate_on_submit():
-        db.session.add(Comment(material_id=material.id, author_id=current_user.id, body=form.body.data))
+        comment = Comment(material_id=material.id, author_id=current_user.id, body=form.body.data)
+        db.session.add(comment)
+        db.session.flush()
+        notify_comment(comment)
         db.session.commit()
         return _comments_response(material)
     if request.headers.get("HX-Request"):
@@ -335,8 +346,10 @@ def report():
                                      status=ReportStatus.PENDING).first()
     if pending is not None:
         return _report_reply(REPORTED_MSG, "info", 200, anchor=anchor)
-    db.session.add(Report(reporter_id=current_user.id, target_type=kind, target_id=target_id,
-                          reason=ReportReason(form.reason.data), details=form.details.data or ""))
+    new_report = Report(reporter_id=current_user.id, target_type=kind, target_id=target_id,
+                        reason=ReportReason(form.reason.data), details=form.details.data or "")
+    db.session.add(new_report)
+    notify_new_report(new_report)
     db.session.commit()
     return _report_reply(THANKS_MSG, "success", 200, anchor=anchor)
 
@@ -347,7 +360,8 @@ def saved():
     page = page_param(request.args.get("pagina"))
     query = (select(Material).join(Favorite, Favorite.material_id == Material.id)
              .where(Favorite.user_id == current_user.id, Material.is_hidden.is_(False))
-             .order_by(Favorite.created_at.desc(), Material.id.desc()))
+             .order_by(Favorite.created_at.desc(), Material.id.desc())
+             .options(*feed_loader_options()))
     pagination = db.paginate(query, page=page, per_page=PER_PAGE, error_out=False)
 
     def page_url(number):
@@ -421,10 +435,11 @@ def build_feed_query(params: Mapping[str, str], viewer: User) -> Select:
     query = select(Material).where(Material.is_hidden.is_(False))
 
     text = (params.get("q") or "").strip()
+    match = None
     if text:
-        pattern = f"%{escape_like(text)}%"
-        query = query.where(or_(Material.title.ilike(pattern, escape="\\"),
-                                Material.description.ilike(pattern, escape="\\")))
+        match = build_match(text)
+        if match is not None:
+            query = query.join(FTS, FTS.c.rowid == Material.id).where(FTS.c.material_fts.op("MATCH")(match))
 
     subject_id = int_param(params.get("asignatura"))
     if subject_id is not None and db.session.get(Subject, subject_id) is not None:
@@ -441,7 +456,16 @@ def build_feed_query(params: Mapping[str, str], viewer: User) -> Select:
     if params.get("profesores") == "1":
         query = query.where(Material.author_id.in_(select(User.id).where(User.is_teacher.is_(True))))
 
-    if params.get("orden") == "valorados":
+    order = params.get("orden")
+    if order == "relevantes" and match is None:
+        order = None
+    elif order not in ("valorados", "recientes") and match is not None:
+        order = "relevantes"  # por defecto con texto de búsqueda
+
+    if order == "relevantes":
+        query = query.order_by(func.bm25(literal_column("material_fts"), 10.0, 3.0, 1.0, 1.0), Material.created_at.desc(),
+                               Material.id.desc())
+    elif order == "valorados":
         stats = (select(Rating.material_id.label("material_id"),
                         func.avg(Rating.stars).label("average"),
                         func.count(Rating.stars).label("votes"))
@@ -459,7 +483,7 @@ def build_feed_query(params: Mapping[str, str], viewer: User) -> Select:
 def explore():
     params = request.args
     page = page_param(params.get("pagina"))
-    pagination = db.paginate(build_feed_query(params, current_user), page=page,
+    pagination = db.paginate(build_feed_query(params, current_user).options(*feed_loader_options()), page=page,
                              per_page=PER_PAGE, error_out=False)
 
     def page_url(number):
@@ -469,7 +493,8 @@ def explore():
         return url_for("materials.explore", **args)
 
     context = {"pagination": pagination, "page": pagination.page, "pages": pagination.pages,
-               "page_url": page_url, "favorite_ids": favorite_ids(pagination.items)}
+               "page_url": page_url,
+               "can_rank": build_match((params.get("q") or "").strip()) is not None, "favorite_ids": favorite_ids(pagination.items)}
     # Misma URL para fragmento y página completa: las cachés deben distinguirlas (Vary) y al
     # volver con «Atrás» htmx pide la página completa (HX-History-Restore-Request).
     if request.headers.get("HX-Request") and not request.headers.get("HX-History-Restore-Request"):

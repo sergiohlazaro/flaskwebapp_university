@@ -1,5 +1,6 @@
 import os
 import secrets
+from datetime import UTC, datetime
 
 from flask import Flask, Response, redirect, request, url_for
 from flask_compress import Compress
@@ -48,6 +49,10 @@ def create_app(test_config=None):
         hops = int(trusted_proxies)
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops)
 
+    from .services.search import check_fts5_available
+
+    check_fts5_available()
+
     Compress(app)
     csrf.init_app(app)
     limiter.init_app(app)
@@ -62,9 +67,15 @@ def create_app(test_config=None):
 
     @login_manager.user_loader
     def load_user(id):
-        user = db.session.get(User, int(id))
+        # SEC-11: solo "<id>:<versión>"; el formato antiguo ("<id>") y versiones viejas se rechazan.
+        uid, sep, version = str(id).partition(":")
+        if not (sep and uid.isascii() and uid.isdigit() and version.isascii() and version.isdigit()):
+            return None
+        user = db.session.get(User, int(uid))
         # SEC-07: un usuario bloqueado pierde la sesión en la siguiente petición.
-        return None if user is None or user.is_blocked else user
+        if user is None or user.is_blocked or (user.session_version or 0) != int(version):
+            return None
+        return user
 
     from werkzeug.routing import IntegerConverter
 
@@ -82,6 +93,7 @@ def create_app(test_config=None):
     from .blueprints.main import main
     from .blueprints.materials import materials
     from .blueprints.messages import messages
+    from .blueprints.notifications import notifications
     from .blueprints.users import users
 
     app.register_blueprint(auth, url_prefix="/")
@@ -90,13 +102,20 @@ def create_app(test_config=None):
     app.register_blueprint(admin)
     app.register_blueprint(materials)
     app.register_blueprint(messages)
+    app.register_blueprint(notifications)
     app.register_blueprint(users)
 
     # No se crean usuarios por defecto. El primer administrador se crea con:
     #   flask --app main create-admin
-    from .commands import create_admin_command
+    from .commands import (
+        create_admin_command,
+        purge_data_command,
+        reindex_search_command,
+    )
 
     app.cli.add_command(create_admin_command)
+    app.cli.add_command(reindex_search_command)
+    app.cli.add_command(purge_data_command)
 
     from .filters import register_filters
 
@@ -106,6 +125,10 @@ def create_app(test_config=None):
 
     register_error_handlers(app)
 
+    from .services.mail import init_mail
+
+    init_mail(app)
+
     from .services.headers import register_security_headers
 
     register_security_headers(app)
@@ -113,13 +136,19 @@ def create_app(test_config=None):
     @app.context_processor
     def inject_globals():
         from .models import Message
+        from .services.notifications import unread_count
 
-        unread = 0
+        unread = unread_notifications = 0
         if current_user.is_authenticated:
+            unread_notifications = unread_count(current_user)
             unread = db.session.scalar(
                 select(func.count(Message.id)).where(Message.receiver_id == current_user.id,
                                                      Message.read_at.is_(None))) or 0
-        return {"app_name": app.config["APP_NAME"], "unread_messages_count": unread}
+        from .blueprints.admin import EXCERPT_LEN
+
+        return {"app_name": app.config["APP_NAME"], "unread_messages_count": unread,
+                "unread_notifications_count": unread_notifications,
+                "current_year": datetime.now(UTC).year, "EXCERPT_LEN": EXCERPT_LEN}
 
     @login_manager.unauthorized_handler
     def unauthorized():

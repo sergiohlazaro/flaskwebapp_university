@@ -63,19 +63,19 @@ def test_search_matches_title_and_description_case_insensitive(app, client, user
     found, _ = _titles(client.get("/explorar?q=NORMALIZ"))
     assert found == ["Alfa", "Beta"]
     found, _ = _titles(client.get("/explorar?q=normalizacion"))
-    assert found == ["Beta"]  # sin tilde solo coincide la descripción sin acento
+    assert found == ["Alfa", "Beta"]  # FTS5 ignora tildes: ambas descripciones coinciden
     found, _ = _titles(client.get("/explorar?q=gAMMa"))
     assert found == ["Gamma"]
 
 
-def test_search_escapes_wildcards(app, client, user):
+def test_search_wildcards_are_not_terms(app, client, user):
     subject = _subject("Redes")
     _material(user, subject, "Alfa", description="100% seguro")
     _material(user, subject, "Beta", description="nada")
-    found, _ = _titles(client.get("/explorar?q=%25"))
-    assert found == ["Alfa"]
-    found, _ = _titles(client.get("/explorar?q=_"))
-    assert found == []
+    # Con FTS, % y _ no son comodines ni términos válidos: la consulta se ignora y se lista todo.
+    assert _titles(client.get("/explorar?q=%25"))[0] == ["Alfa", "Beta"]
+    assert _titles(client.get("/explorar?q=_"))[0] == ["Alfa", "Beta"]
+    assert _titles(client.get("/explorar?q=100"))[0] == ["Alfa"]
 
 
 def test_filters_by_subject_course_kind_and_teacher(app, client, user):

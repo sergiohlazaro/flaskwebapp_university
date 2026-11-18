@@ -122,3 +122,11 @@ def test_app_js_has_delegated_confirm_listener():
     js = Path(__file__).resolve().parent.parent / "website" / "static" / "js" / "app.js"
     text = js.read_text(encoding="utf-8")
     assert "data-confirm" in text and "window.confirm" in text
+
+
+def test_home_redirects_to_explore(client):
+    make_user("h@example.com")
+    login(client, "h@example.com")
+    r = client.get("/home")
+    assert r.status_code == 302
+    assert r.headers["Location"] == "/explorar"

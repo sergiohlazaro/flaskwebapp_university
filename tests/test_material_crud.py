@@ -1,7 +1,7 @@
 import io
 import os
 
-from tests.conftest import login, make_user, png_bytes
+from tests.conftest import login, make_user
 from website import db
 from website.models import Material, MaterialFile, Subject
 
@@ -118,7 +118,6 @@ def make_material(author, subject, n=1):
     m = Material(title="Orig", description="d", subject_id=subject.id, author_id=author.id)
     db.session.add(m)
     db.session.flush()
-    from flask import current_app
     from werkzeug.datastructures import FileStorage
 
     from website.services.uploads import ALLOWED_MATERIAL_EXTENSIONS, save_upload
@@ -128,7 +127,7 @@ def make_material(author, subject, n=1):
         m.files.append(MaterialFile(stored_name=f.stored_name, original_name=f.original_name,
                                     mime=f.mime, size=f.size))
     db.session.commit()
-    assert current_app
+    assert len(m.files) == n
     return m
 
 
@@ -228,4 +227,3 @@ def test_detail_hidden_stub(app, client):
     login(client, "o@x.es")
     assert client.get(f"/material/{m.id}").status_code == 404
     assert client.get("/material/9999").status_code == 404
-    assert png_bytes

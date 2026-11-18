@@ -10,17 +10,13 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-fileConfig(config.config_file_name)
+fileConfig(config.config_file_name, disable_existing_loggers=False)
 logger = logging.getLogger('alembic.env')
 
 
 def get_engine():
-    try:
-        # this works with Flask-SQLAlchemy<3 and Alchemical
-        return current_app.extensions['migrate'].db.get_engine()
-    except (TypeError, AttributeError):
-        # this works with Flask-SQLAlchemy>=3
-        return current_app.extensions['migrate'].db.engine
+    # Flask-SQLAlchemy>=3 (get_engine() está obsoleto)
+    return current_app.extensions['migrate'].db.engine
 
 
 def get_engine_url():
@@ -50,6 +46,11 @@ def get_metadata():
     return target_db.metadata
 
 
+def include_object(obj, name, type_, reflected, compare_to):
+    # La tabla virtual FTS5 y sus tablas de apoyo no están en el modelo (services/search.py).
+    return not (type_ == "table" and name.startswith("material_fts"))
+
+
 def run_migrations_offline():
     """Run migrations in 'offline' mode.
 
@@ -64,7 +65,7 @@ def run_migrations_offline():
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url, target_metadata=get_metadata(), literal_binds=True
+        url=url, target_metadata=get_metadata(), literal_binds=True, include_object=include_object
     )
 
     with context.begin_transaction():
@@ -92,6 +93,8 @@ def run_migrations_online():
     conf_args = current_app.extensions['migrate'].configure_args
     if conf_args.get("process_revision_directives") is None:
         conf_args["process_revision_directives"] = process_revision_directives
+
+    conf_args.setdefault("include_object", include_object)
 
     connectable = get_engine()
 

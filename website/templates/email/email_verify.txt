@@ -1,0 +1,7 @@
+Hola {{ name }},
+
+Gracias por usar {{ app_name }}. Para confirmar tu dirección de email abre este enlace (válido durante 48 horas):
+
+{{ link }}
+
+Si no has sido tú, ignora este mensaje.

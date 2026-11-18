@@ -7,6 +7,20 @@ from website import create_app
 MEMORY_DB = {"SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"}
 
 
+def test_testing_config_never_requires_verification(monkeypatch):
+    monkeypatch.setenv("MAIL_BACKEND", "smtp")
+    import importlib
+
+    from website import config as config_module
+    try:
+        importlib.reload(config_module)
+        assert config_module.BaseConfig.REQUIRE_EMAIL_VERIFICATION is True
+        assert config_module.TestingConfig.REQUIRE_EMAIL_VERIFICATION is False
+    finally:
+        monkeypatch.undo()
+        importlib.reload(config_module)
+
+
 def test_production_requires_secret_key(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.delenv("SECRET_KEY", raising=False)
