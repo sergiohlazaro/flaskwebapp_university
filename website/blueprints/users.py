@@ -176,19 +176,26 @@ def update_email():
             form.current_password.errors = [WRONG_PASSWORD]
         elif form.new_email.data == current_user.email:
             form.new_email.errors = ["Ese ya es tu email."]
-        elif _email_taken(form.new_email.data):
-            form.new_email.errors = [DUPLICATE_EMAIL]
         elif current_app.config["REQUIRE_EMAIL_VERIFICATION"]:
-            # El email no cambia hasta verificar la nueva dirección.
-            current_user.pending_email = form.new_email.data
-            db.session.commit()
-            link = url_for("auth.verify_email", _external=True,
-                           token=make_verify_token(current_user, form.new_email.data))
-            send_email(form.new_email.data, "Confirma tu nuevo email", "email/email_verify.txt",
-                       name=current_user.name, link=link)
-            flash(f"Te hemos enviado un enlace a {form.new_email.data} para confirmarlo. "
+            # El email no cambia hasta verificar la nueva dirección. Misma respuesta si la dirección
+            # ya es de otra cuenta (sin enumeración): solo su dueño recibe un aviso.
+            new_email = form.new_email.data
+            if _email_taken(new_email):
+                owner = User.query.filter_by(email=new_email).first()
+                send_email(owner.email, "Intento de uso de tu email", "email/email_change_taken.txt",
+                           name=owner.name, link=url_for("auth.forgot_password", _external=True))
+            else:
+                current_user.pending_email = new_email
+                db.session.commit()
+                link = url_for("auth.verify_email", _external=True,
+                               token=make_verify_token(current_user, new_email))
+                send_email(new_email, "Confirma tu nuevo email", "email/email_verify.txt",
+                           name=current_user.name, link=link)
+            flash(f"Te hemos enviado un enlace a {new_email} para confirmarlo. "
                   "Tu email no cambia hasta entonces.", "success")
             return redirect(url_for("users.account"))
+        elif _email_taken(form.new_email.data):
+            form.new_email.errors = [DUPLICATE_EMAIL]
         else:
             current_user.email = form.new_email.data
             try:

@@ -1,0 +1,7 @@
+Hola {{ name }},
+
+Alguien ha intentado asociar tu dirección de email a otra cuenta de {{ app_name }}, pero ya está en uso en la tuya.
+
+Si has sido tú, no necesitas hacer nada más. Si no, puedes ignorar este mensaje; tu cuenta no ha cambiado. Si sospechas de un acceso no autorizado, restablece tu contraseña aquí:
+
+{{ link }}

@@ -183,6 +183,27 @@ def test_email_change_goes_to_pending_until_verified(app_verify, vclient):
     assert vclient.get("/cuenta").status_code == 200
 
 
+@pytest.mark.parametrize("new", ["free@uni.es", "taken@uni.es"])
+def test_email_change_with_verification_same_response(app_verify, vclient, new):
+    user = make_user("old@uni.es")
+    make_user("taken@uni.es", name="Owner")
+    login(vclient, "old@uni.es")
+    response = _change_email(vclient, new)
+    assert response.status_code == 302
+    html = vclient.get(response.headers["Location"]).get_data(as_text=True)
+    assert f"Te hemos enviado un enlace a {new} para confirmarlo. Tu email no cambia hasta entonces." in html
+    assert "Ya existe una cuenta con ese email." not in html
+    db.session.refresh(user)
+    assert user.email == "old@uni.es"
+    [mail] = sent_emails()
+    assert mail["to"] == new
+    if new == "free@uni.es":
+        assert user.pending_email == new and "/verificar/" in mail["body"]
+    else:
+        assert user.pending_email is None
+        assert "/verificar/" not in mail["body"] and "Owner" in mail["body"]
+
+
 def test_stale_verify_token_does_not_apply(app_verify, vclient):
     user = make_user("old@uni.es")
     login(vclient, "old@uni.es")
