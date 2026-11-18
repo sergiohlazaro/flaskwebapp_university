@@ -88,7 +88,7 @@ class Subject(db.Model):
     name = db.Column(db.String(120), nullable=False)
     # Clave normalizada (casefold) para unicidad sin distinguir mayúsculas,
     # también con letras no ASCII (lower() de SQLite no las pliega).
-    name_key = db.Column(db.String(120), nullable=False, unique=True)
+    name_key = db.Column(db.String(200), nullable=False, unique=True)
     is_archived = db.Column(db.Boolean, nullable=False, default=False)
 
     @validates("name")

@@ -1,5 +1,6 @@
 import os
 import secrets
+from datetime import UTC, datetime
 
 from flask import Flask, Response, redirect, request, url_for
 from flask_compress import Compress
@@ -119,7 +120,10 @@ def create_app(test_config=None):
             unread = db.session.scalar(
                 select(func.count(Message.id)).where(Message.receiver_id == current_user.id,
                                                      Message.read_at.is_(None))) or 0
-        return {"app_name": app.config["APP_NAME"], "unread_messages_count": unread}
+        from .blueprints.admin import EXCERPT_LEN
+
+        return {"app_name": app.config["APP_NAME"], "unread_messages_count": unread,
+                "current_year": datetime.now(UTC).year, "EXCERPT_LEN": EXCERPT_LEN}
 
     @login_manager.unauthorized_handler
     def unauthorized():

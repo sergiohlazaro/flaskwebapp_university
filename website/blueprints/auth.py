@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import login_required, login_user, logout_user
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..extensions import db, limiter
@@ -109,7 +110,13 @@ def signup():
             password=generate_password_hash(form.password.data, method='pbkdf2:sha256'),
         )
         db.session.add(new_user)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            # Carrera: otro registro con el mismo email se coló tras la comprobación del formulario.
+            db.session.rollback()
+            form.email.errors = list(form.email.errors) + ["Ya existe una cuenta con ese email."]
+            return render_template("auth/signup.html", form=form)
 
         login_user(new_user, remember=True)
         db.session.add(LoginRecord(user_id=new_user.id, ip_address=request.remote_addr))

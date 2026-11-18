@@ -2,6 +2,7 @@
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, logout_user
 from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..extensions import db, limiter
@@ -143,6 +144,13 @@ def update_avatar():
     return redirect(url_for("users.account"))
 
 
+DUPLICATE_EMAIL = "Ya existe una cuenta con ese email."
+
+
+def _email_taken(email):
+    return db.session.scalar(select(User.id).where(User.email == email)) is not None
+
+
 @users.route("/cuenta/email", methods=["POST"])
 @limiter.limit("10 per minute")
 @login_required
@@ -153,13 +161,19 @@ def update_email():
             form.current_password.errors = [WRONG_PASSWORD]
         elif form.new_email.data == current_user.email:
             form.new_email.errors = ["Ese ya es tu email."]
-        elif db.session.scalar(select(User.id).where(User.email == form.new_email.data)):
-            form.new_email.errors = ["Ya existe una cuenta con ese email."]
+        elif _email_taken(form.new_email.data):
+            form.new_email.errors = [DUPLICATE_EMAIL]
         else:
             current_user.email = form.new_email.data
-            db.session.commit()
-            flash("Email actualizado.", "success")
-            return redirect(url_for("users.account"))
+            try:
+                db.session.commit()
+            except IntegrityError:
+                # Carrera: el email lo ocupó otra cuenta tras la comprobación previa.
+                db.session.rollback()
+                form.new_email.errors = [DUPLICATE_EMAIL]
+            else:
+                flash("Email actualizado.", "success")
+                return redirect(url_for("users.account"))
     return _render_account(email_form=form)
 
 

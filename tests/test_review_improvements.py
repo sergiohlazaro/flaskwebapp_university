@@ -107,3 +107,79 @@ def test_pagination_htmx_request_returns_fragment(app, client):
     assert "<html" not in html
     assert "Material 0" in html
     assert "HX-Request" in response.headers["Vary"]
+
+
+# --- Fase 5, tarea 2: carreras de email, accesibilidad y limpiezas ---
+
+DUPLICATE_EMAIL = "Ya existe una cuenta con ese email."
+
+
+def test_signup_duplicate_email_race_no_500(app, client, monkeypatch):
+    from website.forms import SignupForm
+    make_user("taken@x.com")
+    # La comprobación previa del formulario no ve el duplicado: lo detecta la restricción única.
+    monkeypatch.setattr(SignupForm, "validate_email", lambda self, field: None)
+    response = client.post("/registro", data={
+        "name": "Ana", "surname": "Ruiz", "email": "taken@x.com",
+        "password": "password123", "password2": "password123",
+    })
+    assert response.status_code == 200
+    assert DUPLICATE_EMAIL in response.get_data(as_text=True)
+
+
+def test_update_email_race_no_500(app, client, monkeypatch):
+    from tests.conftest import PASSWORD
+    from website.blueprints import users as users_bp
+    make_user("owner@x.com")
+    make_user("other@x.com")
+    login(client, "owner@x.com")
+    monkeypatch.setattr(users_bp, "_email_taken", lambda email: False)
+    response = client.post("/cuenta/email", data={
+        "new_email": "other@x.com", "current_password": PASSWORD,
+    })
+    assert response.status_code == 200
+    assert DUPLICATE_EMAIL in response.get_data(as_text=True)
+
+
+def test_footer_shows_current_year(client):
+    from datetime import date
+    assert str(date.today().year) in client.get("/").get_data(as_text=True)
+
+
+def test_decorative_icons_are_aria_hidden(app, client):
+    import re
+    make_user("adm@x.com", role=0)
+    login(client, "adm@x.com")
+    for path in ("/admin/usuarios", "/admin/asignaturas"):
+        html = client.get(path).get_data(as_text=True)
+        icons = re.findall(r'<i class="bi [^>]*>', html)
+        assert icons
+        assert all('aria-hidden="true"' in tag for tag in icons), path
+
+
+def test_rating_block_has_aria_live(app, client):
+    owner = make_user("o@x.com")
+    viewer = make_user("v@x.com")
+    subject = Subject(name="Mates")
+    db.session.add(subject)
+    db.session.commit()
+    material = Material(title="T", description="d", author_id=owner.id, subject_id=subject.id)
+    db.session.add(material)
+    db.session.commit()
+    login(client, viewer.email)
+    html = client.get(f"/material/{material.id}").get_data(as_text=True)
+    tag = next(line for line in html.splitlines() if 'id="rating-block"' in line)
+    assert 'aria-live="polite"' in tag
+
+
+def test_subject_name_key_length_200(app):
+    subject = Subject(name="ß" * 100)
+    db.session.add(subject)
+    db.session.commit()
+    assert Subject.query.one().name_key == "ss" * 100
+
+
+def test_hidden_template_uses_excerpt_constant():
+    from pathlib import Path
+    source = Path("website/templates/admin/hidden.html").read_text(encoding="utf-8")
+    assert "[:120]" not in source
