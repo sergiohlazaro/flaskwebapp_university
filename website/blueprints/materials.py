@@ -2,7 +2,16 @@
 from collections.abc import Mapping
 from urllib.parse import urlsplit
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    abort,
+    flash,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -461,8 +470,13 @@ def explore():
 
     context = {"pagination": pagination, "page": pagination.page, "pages": pagination.pages,
                "page_url": page_url, "favorite_ids": favorite_ids(pagination.items)}
-    if request.headers.get("HX-Request"):
-        return render_template("partials/material_list.html", **context)
-    subjects = Subject.query.order_by(Subject.name_key).all()
-    return render_template("materials/explore.html", subjects=subjects, courses=list(Course),
-                           kinds=list(MaterialKind), filters=params, **context)
+    # Misma URL para fragmento y página completa: las cachés deben distinguirlas (Vary) y al
+    # volver con «Atrás» htmx pide la página completa (HX-History-Restore-Request).
+    if request.headers.get("HX-Request") and not request.headers.get("HX-History-Restore-Request"):
+        response = make_response(render_template("partials/material_list.html", **context))
+    else:
+        subjects = Subject.query.order_by(Subject.name_key).all()
+        response = make_response(render_template("materials/explore.html", subjects=subjects, courses=list(Course),
+                                                 kinds=list(MaterialKind), filters=params, **context))
+    response.vary.add("HX-Request")
+    return response

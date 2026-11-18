@@ -150,3 +150,27 @@ def test_qa03_each_login_record_gets_its_own_timestamp(app):
     db.session.commit()
 
     assert second.login_time > first.login_time
+
+
+def test_create_admin_normalizes_email_to_lowercase(app):
+    result = app.test_cli_runner().invoke(args=["create-admin", "--email", "  Boss@Uni.ES "],
+                                          input="S3cure-pass!\nS3cure-pass!\n")
+    assert result.exit_code == 0, result.output
+    assert User.query.filter_by(email="boss@uni.es").one().role == 0
+
+
+def test_create_admin_rejects_invalid_email(app):
+    result = app.test_cli_runner().invoke(args=["create-admin", "--email", "not-an-email"],
+                                          input="S3cure-pass!\nS3cure-pass!\n")
+    assert result.exit_code != 0
+    assert "email" in result.output.lower()
+    assert User.query.count() == 0
+
+
+def test_create_admin_duplicate_check_is_case_insensitive(app):
+    make_user("boss@uni.es")
+    result = app.test_cli_runner().invoke(args=["create-admin", "--email", "BOSS@uni.es"],
+                                          input="S3cure-pass!\nS3cure-pass!\n")
+    assert result.exit_code != 0
+    assert "already exists" in result.output
+    assert User.query.count() == 1

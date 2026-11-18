@@ -1,11 +1,14 @@
 """Comandos de línea de órdenes de la aplicación (flask --app main <comando>)."""
 import click
+from email_validator import EmailNotValidError, validate_email
+from sqlalchemy import func
 from werkzeug.security import generate_password_hash
 
 from .extensions import db
 from .models import User
 
 MIN_PASSWORD_LENGTH = 8
+MAX_EMAIL_LENGTH = 100  # tamaño de la columna user.email
 
 
 @click.command("create-admin")
@@ -17,7 +20,14 @@ def create_admin_command(email, name, surname, password):
     """Crea una cuenta de administrador con la contraseña indicada."""
     if len(password) < MIN_PASSWORD_LENGTH:
         raise click.ClickException(f"Password must be at least {MIN_PASSWORD_LENGTH} characters long")
-    if User.query.filter_by(email=email).first():
+    email = email.strip().lower()
+    try:
+        validate_email(email, check_deliverability=False)
+    except EmailNotValidError as exc:
+        raise click.ClickException(f"Invalid email: {exc}") from None
+    if len(email) > MAX_EMAIL_LENGTH:
+        raise click.ClickException("Invalid email: it is too long")
+    if User.query.filter(func.lower(User.email) == email).first():
         raise click.ClickException("A user with this email already exists")
 
     admin = User(

@@ -206,3 +206,22 @@ def test_card_shows_teacher_badge_rating_and_file_count(app, client, user):
                                   "/material/99999999999999999999/editar"])
 def test_huge_int_url_segment_is_404_not_500(client, user, path):
     assert client.get(path).status_code == 404
+
+
+def test_explore_varies_on_hx_request(client):
+    make_user("v@example.com")
+    login(client, "v@example.com")
+    for headers in ({}, {"HX-Request": "true"}):
+        r = client.get("/explorar", headers=headers)
+        assert "HX-Request" in r.headers.get("Vary", "")
+
+
+def test_explore_history_restore_returns_full_page(client):
+    make_user("h@example.com")
+    login(client, "h@example.com")
+    r = client.get("/explorar", headers={"HX-Request": "true", "HX-History-Restore-Request": "true"})
+    html = r.get_data(as_text=True)
+    assert "<html" in html and "<nav" in html
+    assert "HX-Request" in r.headers.get("Vary", "")
+    fragment = client.get("/explorar", headers={"HX-Request": "true"}).get_data(as_text=True)
+    assert "<html" not in fragment
