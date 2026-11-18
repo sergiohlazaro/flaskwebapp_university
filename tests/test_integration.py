@@ -1,3 +1,5 @@
+import io
+
 import pytest
 from werkzeug.security import generate_password_hash
 
@@ -49,25 +51,38 @@ def register_user(client, name, surname, email, password):
     }, follow_redirects=True)
     client.post("/logout", follow_redirects=True)
 
-# --------- INTEGRACIÓN: Registro + Login + Publicación ---------
-# Casos de prueba: TC-001, TC-004, TC-019
+# --------- INTEGRACIÓN: Registro + Login + Material ---------
+# Casos de prueba: TC-001, TC-004 (la publicación TC-019 se sustituye por subir material)
 
-def test_register_login_create_publication(client):
-    # TC-001: Registrar nuevo usuario con datos válidos
+def test_register_login_create_material(client, app):
+    from website.models import Subject
     register_user(client, "Integration", "Tester", "integration@example.com", "password123")
 
-    # TC-004: Login con el nuevo usuario
     response = client.post("/login", data={
         "email": "integration@example.com",
         "password": "password123"
     }, follow_redirects=True)
     assert "Sesión iniciada correctamente".encode() in response.data
 
-    # TC-019: Crear publicación con contenido válido
-    response = client.post("/publications", data={
-        "publication": "Mi primera publicación de integración"
-    }, follow_redirects=True)
-    assert b"Publication added" in response.data
+    with app.app_context():
+        subject = Subject(name="Cálculo")
+        db.session.add(subject)
+        db.session.commit()
+        subject_id = subject.id
+
+    response = client.post("/material/nuevo", data={
+        "title": "Apuntes de integración",
+        "description": "Resumen del tema 1",
+        "subject_id": subject_id,
+        "course": "",
+        "kind": "",
+        "files": [(io.BytesIO(b"contenido"), "apuntes.txt")],
+    }, content_type="multipart/form-data", follow_redirects=True)
+    assert b"Material publicado." in response.data
+
+    response = client.get("/explorar")
+    assert "Apuntes de integración".encode() in response.data
+
 
 # --------- INTEGRACIÓN: Admin bloquea y desbloquea usuario ---------
 # Casos de prueba: TC-007, TC-028, TC-029

@@ -4,6 +4,7 @@
         <p class="material-meta text-uppercase small mb-1">
             {{ material.subject.name }}{% if material.course %} · {{ material.course.value }}{% endif %}{% if material.kind %} · {{ material.kind.value }}{% endif %}
         </p>
+        {% if material.is_hidden %}<span class="badge text-bg-warning mb-1">Oculto</span>{% endif %}
         <h3 class="h6 card-title mb-2">
             <a class="stretched-link text-decoration-none" href="{{ url_for('materials.detail', material_id=material.id) }}">{{ material.title }}</a>
         </h3>

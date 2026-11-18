@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Mi cuenta · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <h1 class="h3 mb-4">Mi cuenta</h1>
+        <section class="card mb-4"><div class="card-body p-4">
+            <h2 class="h5 mb-3">Perfil</h2>
+            <form method="post" action="{{ url_for('users.update_profile') }}" novalidate>
+                {{ profile_form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ profile_form.name.label(class="form-label") }}
+                    {{ profile_form.name(class="form-control" ~ (" is-invalid" if profile_form.name.errors else ""), autocomplete="given-name") }}
+                    {% for e in profile_form.name.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ profile_form.surname.label(class="form-label") }}
+                    {{ profile_form.surname(class="form-control" ~ (" is-invalid" if profile_form.surname.errors else ""), autocomplete="family-name") }}
+                    {% for e in profile_form.surname.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ profile_form.bio.label(class="form-label") }}
+                    {{ profile_form.bio(class="form-control" ~ (" is-invalid" if profile_form.bio.errors else ""), rows="4", maxlength="300") }}
+                    {% for e in profile_form.bio.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ profile_form.twitter.label(class="form-label") }}
+                    {{ profile_form.twitter(class="form-control" ~ (" is-invalid" if profile_form.twitter.errors else ""), maxlength="50") }}
+                    {% for e in profile_form.twitter.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ profile_form.linkedin.label(class="form-label") }}
+                    {{ profile_form.linkedin(class="form-control" ~ (" is-invalid" if profile_form.linkedin.errors else ""), maxlength="50") }}
+                    {% for e in profile_form.linkedin.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <button type="submit" class="btn btn-primary">Guardar perfil</button>
+            </form>
+        </div></section>
+        <section class="card mb-4"><div class="card-body p-4">
+            <h2 class="h5 mb-3">Foto de perfil</h2>
+            <form method="post" action="{{ url_for('users.update_avatar') }}" enctype="multipart/form-data" novalidate>
+                {{ avatar_form.hidden_tag() }}
+                <div class="mb-3 d-flex align-items-center gap-3">
+                    <img class="avatar-lg" src="{{ url_for('files.avatar', user_id=current_user.id) }}" alt="Tu foto de perfil actual">
+                    <div class="flex-grow-1">
+                        {{ avatar_form.avatar.label(class="form-label") }}
+                        {{ avatar_form.avatar(class="form-control" ~ (" is-invalid" if avatar_form.avatar.errors else ""), accept="image/png,image/jpeg,image/gif") }}
+                        {% for e in avatar_form.avatar.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                        <div class="form-text">PNG, JPG o GIF. Se ajusta a un máximo de 300×300 píxeles.</div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Subir foto</button>
+            </form>
+        </div></section>
+        <section class="card mb-4"><div class="card-body p-4">
+            <h2 class="h5 mb-3">Email</h2>
+            <p class="small text-secondary">Tu email actual es <strong>{{ current_user.email }}</strong>. Solo tú lo ves.</p>
+            <form method="post" action="{{ url_for('users.update_email') }}" novalidate>
+                {{ email_form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ email_form.new_email.label(class="form-label") }}
+                    {{ email_form.new_email(class="form-control" ~ (" is-invalid" if email_form.new_email.errors else ""), type="email", autocomplete="email") }}
+                    {% for e in email_form.new_email.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ email_form.current_password.label(class="form-label") }}
+                    {{ email_form.current_password(class="form-control" ~ (" is-invalid" if email_form.current_password.errors else ""), autocomplete="current-password") }}
+                    {% for e in email_form.current_password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <button type="submit" class="btn btn-primary">Cambiar email</button>
+            </form>
+        </div></section>
+        <section class="card mb-4"><div class="card-body p-4">
+            <h2 class="h5 mb-3">Contraseña</h2>
+            <form method="post" action="{{ url_for('users.update_password') }}" novalidate>
+                {{ password_form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ password_form.current_password.label(class="form-label") }}
+                    {{ password_form.current_password(class="form-control" ~ (" is-invalid" if password_form.current_password.errors else ""), autocomplete="current-password") }}
+                    {% for e in password_form.current_password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ password_form.new_password.label(class="form-label") }}
+                    {{ password_form.new_password(class="form-control" ~ (" is-invalid" if password_form.new_password.errors else ""), autocomplete="new-password") }}
+                    {% for e in password_form.new_password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ password_form.confirm_password.label(class="form-label") }}
+                    {{ password_form.confirm_password(class="form-control" ~ (" is-invalid" if password_form.confirm_password.errors else ""), autocomplete="new-password") }}
+                    {% for e in password_form.confirm_password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
+            </form>
+        </div></section>
+        <section class="card mb-4"><div class="card-body p-4">
+            <h2 class="h5 mb-3">Borrar cuenta</h2>
+            <p class="small text-secondary">Se borrarán tu material, comentarios, valoraciones y favoritos. Los mensajes que enviaste seguirán visibles para la otra persona.</p>
+            <form method="post" action="{{ url_for('users.delete_account') }}" novalidate>
+                {{ delete_form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ delete_form.current_password.label(class="form-label") }}
+                    {{ delete_form.current_password(class="form-control" ~ (" is-invalid" if delete_form.current_password.errors else ""), autocomplete="current-password") }}
+                    {% for e in delete_form.current_password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="mb-3 form-check">
+                    {{ delete_form.confirm(class="form-check-input" ~ (" is-invalid" if delete_form.confirm.errors else "")) }}
+                    {{ delete_form.confirm.label(class="form-check-label") }}
+                    {% for e in delete_form.confirm.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                </div>
+                <button type="submit" class="btn btn-danger">Borrar mi cuenta</button>
+            </form>
+        </div></section>
+    </div>
+</div>
+{% endblock %}

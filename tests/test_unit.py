@@ -117,34 +117,6 @@ def test_login_wrong_password(client, user):
     }, follow_redirects=True)
     assert "Email o contraseña incorrectos.".encode() in response.data
 
-# --------- PUBLICACIONES ---------
-
-def test_create_valid_publication(client, user):
-    """
-    TC-019: Crear publicación con contenido válido.
-    """
-    client.post("/login", data={
-        "email": user.email,
-        "password": "password123"
-    })
-    response = client.post("/publications", data={
-        "publication": "Esto es un post válido"
-    }, follow_redirects=True)
-    assert b"Publication added" in response.data
-
-def test_create_invalid_publication(client, user):
-    """
-    TC-020: Crear publicación vacía (inválida).
-    """
-    client.post("/login", data={
-        "email": user.email,
-        "password": "password123"
-    })
-    response = client.post("/publications", data={
-        "publication": ""
-    }, follow_redirects=True)
-    assert b"The content must contain at least one character" in response.data
-
 # --------- MENSAJES ---------
 
 def test_send_message_nonexistent_user(client, user):
@@ -161,40 +133,11 @@ def test_send_message_nonexistent_user(client, user):
     }, follow_redirects=True)
     assert b"User with this email does not exist!" in response.data
 
-# --------- PERFIL ---------
-
-def test_update_bio_valid(client, user):
-    """
-    TC-016: Actualizar biografía con texto válido.
-    """
-    client.post("/login", data={
-        "email": user.email,
-        "password": "password123"
-    })
-    response = client.post("/update_bio", data={
-        "bio": "Esta es mi nueva bio"
-    }, follow_redirects=True)
-    assert b"Your bio has been updated" in response.data
-
-def test_update_bio_too_long(client, user):
-    """
-    TC-017: Intento de actualizar la bio con más de 100 caracteres.
-    """
-    client.post("/login", data={
-        "email": user.email,
-        "password": "password123"
-    })
-    long_bio = "A" * 101
-    response = client.post("/update_bio", data={
-        "bio": long_bio
-    }, follow_redirects=True)
-    assert b"Bio too long" in response.data
-
 # --------- ACCESO SIN LOGIN ---------
 
-def test_access_publications_without_login(client):
+def test_access_explore_without_login(client):
     """
-    TC-008: Acceder a publicaciones sin iniciar sesión.
+    TC-008: Acceder al feed sin iniciar sesión (sustituye al de publicaciones).
     """
-    response = client.get("/publications", follow_redirects=True)
-    assert "Iniciar sesión".encode() in response.data  # Verifica que se redirige a login
+    response = client.get("/explorar", follow_redirects=True)
+    assert "Iniciar sesión".encode() in response.data

@@ -4,15 +4,12 @@
 import os  # Librería para operaciones con archivos y carpetas
 import uuid  # Nombres de fichero únicos para las subidas
 from werkzeug.utils import secure_filename  # Asegura que los nombres de archivos sean seguros para guardarlos
-from flask import Blueprint, json, jsonify, redirect, render_template, url_for, request, flash
-from flask_login import login_required, current_user, logout_user  # Gestión de sesiones de usuarios
+from flask import Blueprint, redirect, render_template, url_for, request, flash
+from flask_login import login_required, current_user  # Gestión de sesiones de usuarios
 
 
 # Modelos de base de datos
-from .models import db, LoginRecord, User, Publication, Message
-
-# Para hashear y verificar contraseñas
-from werkzeug.security import check_password_hash, generate_password_hash
+from .models import db, User, Message
 
 # Consultas avanzadas de SQLAlchemy
 from sqlalchemy import or_, and_
@@ -25,9 +22,6 @@ import logging
 
 # Importación del limitador de solicitudes (Rate Limiting) para prevenir ataques de fuerza bruta
 from .extensions import limiter
-
-# Servicios compartidos (permisos y almacenamiento privado de subidas)
-from .services.uploads import UploadError, save_avatar
 
 # ---------------------------------
 # CONFIGURACIONES
@@ -65,260 +59,22 @@ def home():
     return redirect(url_for("materials.explore"))
 
 # ---------------------------------
-# PERFIL DE USUARIO (EDITAR PERFIL)
+# URLS ANTIGUAS (redirecciones permanentes)
 # ---------------------------------
 
-@views.route('/profile', methods=['GET', 'POST'])
-@limiter.limit("10 per minute")
-@login_required
-def profile():
-    """
-    Permite a los usuarios actualizar su email, contraseña y foto de perfil.
-    """
-    if request.method == 'POST':
-        # --- Actualización de email ---
-        new_email_raw = request.form.get('new_email')
-        confirm_email_raw = request.form.get('confirm_email')
+@views.route('/profile')
+def profile_redirect():
+    return redirect(url_for("users.account"), code=301)
 
-        new_email = bleach.clean(new_email_raw) if new_email_raw else ''
-        confirm_email = bleach.clean(confirm_email_raw) if confirm_email_raw else ''
-
-        if new_email and confirm_email:
-            if new_email != confirm_email:
-                flash('Emails do not match', category='error')
-                return render_template('legacy/profile.html', user=current_user)
-
-            existing_user = User.query.filter_by(email=new_email).first()
-            if existing_user:
-                flash('Email already exists', category='error')
-                return render_template('legacy/profile.html', user=current_user)
-            else:
-                current_user.email = new_email
-                logging.info(f"User {current_user.id} updated email to {new_email}")
-
-        # --- Actualización de contraseña ---
-        current_password = request.form.get('current_password')
-        new_password = request.form.get('new_password')
-        confirm_password = request.form.get('confirm_password')
-
-        if current_password and new_password and confirm_password:
-            if not check_password_hash(current_user.password, current_password):
-                flash('Current password is incorrect', category='error')
-                return render_template('legacy/profile.html', user=current_user)
-            if len(new_password) < 8:
-                flash('New password must be at least 8 characters long', category='error')
-                return render_template('legacy/profile.html', user=current_user)
-            if new_password != confirm_password:
-                flash('New passwords do not match', category='error')
-                return render_template('legacy/profile.html', user=current_user)
-            else:
-                current_user.password = generate_password_hash(new_password, method='pbkdf2:sha256')
-                logging.info(f"User {current_user.id} updated password.")
-
-        # --- Subida de imagen de perfil ---
-        if 'profile_pic' in request.files:
-            file = request.files['profile_pic']
-            if file.filename == '':
-                flash('No selected file', category='error')
-                return render_template('legacy/profile.html', user=current_user)
-            try:
-                saved = save_avatar(file)
-            except UploadError:
-                flash('Invalid image file type.', category='error')
-                return render_template('legacy/profile.html', user=current_user)
-            current_user.avatar = saved.stored_name
-
-        db.session.commit()
-        flash('Profile updated successfully.', category='success')
-
-    return render_template('legacy/profile.html', user=current_user)
-
-# ---------------------------------
-# ACTUALIZAR BIOGRAFÍA
-# ---------------------------------
-
-@views.route('/update_bio', methods=['POST'])
-@login_required
-def update_bio():
-    bio_raw = request.form.get('bio')
-    bio = bleach.clean(bio_raw)
-    if len(bio) > 100:
-        flash('Bio too long. Maximum 100 characters.', category='error')
-    else:
-        current_user.bio = bio
-        db.session.commit()
-        flash('Your bio has been updated.', category='success')
-    return render_template('legacy/profile.html', user=current_user)
-
-# ---------------------------------
-# ACTUALIZAR REDES SOCIALES
-# ---------------------------------
-
-@views.route('/update_social_links', methods=['POST'])
-@login_required
-def update_social_links():
-    twitter = request.form.get('twitter')
-    linkedin = request.form.get('linkedin')
-    current_user.twitter = bleach.clean(twitter)
-    current_user.linkedin = bleach.clean(linkedin)
-    db.session.commit()
-    flash('Social media links updated.', category='success')
-    return render_template('legacy/profile.html', user=current_user)
-
-# ---------------------------------
-# ELIMINAR CUENTA
-# ---------------------------------
-
-@views.route('/delete_account', methods=['POST'])
-@login_required
-def delete_account():
-    """
-    Elimina el usuario actual y todos sus datos relacionados (mensajes, publicaciones, registros de login).
-    """
-    user_id = current_user.id
-
-    # Borrar publicaciones
-    Publication.query.filter_by(user_id=user_id).delete()
-
-    # Borrar mensajes enviados o recibidos
-    Message.query.filter((Message.sender_id == user_id) | (Message.receiver_id == user_id)).delete()
-
-    # Borrar registros de login
-    LoginRecord.query.filter_by(user_id=user_id).delete()
-
-    # Borrar el propio usuario
-    user = User.query.get(user_id)
-    db.session.delete(user)
-    db.session.commit()
-
-    logout_user()
-    flash('Your account has been deleted.', category='success')
-    return redirect(url_for('auth.login'))
-
-# ---------------------------------
-# PUBLICACIONES (CREAR, VER, ELIMINAR)
-# ---------------------------------
-
-@views.route('/publications', methods=['GET', 'POST'])
-@login_required
-def publications():
-    """
-    Permite al usuario crear publicaciones con texto y archivos adjuntos opcionales.
-    Además, lista sus publicaciones en formato paginado.
-    """
-
-    # Verificar si el usuario está bloqueado
-    if current_user.is_blocked:
-        flash("Your account is blocked", category="error")
-        return redirect(url_for("materials.explore"))
-
-    if request.method == 'POST':
-        publication_raw = request.form.get('publication')
-        publication = bleach.clean(publication_raw)
-
-        file = request.files.get('publication_file')
-        filename = None
-
-        # Procesar archivo adjunto
-        if file and allowed_file_generic(file.filename):
-            # Verificar tipo MIME
-            allowed_mimetypes = ["image/png", "image/jpeg", "image/gif", "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"]
-            if file.mimetype not in allowed_mimetypes:
-                flash('Unsupported file MIME type.', category='error')
-                return redirect(url_for('views.publications'))
-
-            filename = unique_filename(file.filename)
-            upload_folder = os.path.join('website', 'static', 'uploads', 'publications')
-            os.makedirs(upload_folder, exist_ok=True)
-            filepath = os.path.join(upload_folder, filename)
-            file.save(filepath)
-
-        elif file and not allowed_file_generic(file.filename):
-            flash('Unsupported file type.', category='error')
-            return redirect(url_for('views.publications'))
-
-        # Validar contenido
-        if len(publication) > 0 or filename:
-            new_publication = Publication(
-                content=publication,
-                user_id=current_user.id,
-                file_path=filename
-            )
-            db.session.add(new_publication)
-            db.session.commit()
-            flash('Publication added', category='success')
-            return redirect(url_for('views.publications'))
-        else:
-            flash('The content must contain at least one character or an attached file', category='error')
-
-    # Mostrar publicaciones paginadas
-    page = request.args.get('page', 1, type=int)
-    per_page = 8
-    user_publications = Publication.query.filter_by(user_id=current_user.id).order_by(Publication.date.desc()).paginate(page=page, per_page=per_page)
-
-    return render_template("legacy/publications.html", user=current_user, user_publications=user_publications)
-
-
-
-@views.route('/deletePublication', methods=['POST'])
-@login_required
-def deletePublication():
-    """
-    Permite al usuario eliminar sus propias publicaciones.
-    """
-    publication_id = request.form.get('publication_id')
-    publication = Publication.query.get(publication_id)
-
-    if publication:
-        if publication.user_id == current_user.id:
-            db.session.delete(publication)
-            db.session.commit()
-            flash('Publication deleted successfully', category='success')
-            logging.info(f"User {current_user.email} deleted publication ID {publication_id}")
-        else:
-            flash('You are not authorized to delete this publication', category='error')
-            logging.warning(f"Unauthorized delete attempt by {current_user.email} for publication ID {publication_id}")
-    else:
-        flash('Publication not found', category='error')
-        logging.warning(f"User {current_user.email} attempted to delete non-existent publication ID {publication_id}")
-
-    return redirect(url_for('views.publications'))
-
-# ---------------------------------
-# VER PERFIL Y PUBLICACIONES DE OTRO USUARIO
-# ---------------------------------
-
-@views.route('/viewuser/<email>')
-@login_required
-def viewuser(email):
-    """
-    Muestra las publicaciones de otro usuario.
-    """
-    user = User.query.filter_by(email=email).first()
-    if user:
-        page = request.args.get('page', 1, type=int)
-        per_page = 8
-        user_publications = Publication.query.filter_by(user_id=user.id)\
-            .order_by(Publication.date.desc())\
-            .paginate(page=page, per_page=per_page)
-
-        return render_template("legacy/publications.html", user=user, user_publications=user_publications)
-    else:
-        flash('User not found', category='error')
-        return render_template("legacy/userlist.html", user=current_user)
-
-# ---------------------------------
-# LISTA DE USUARIOS
-# ---------------------------------
 
 @views.route('/userlist')
-@login_required
-def userlist():
-    """
-    Muestra la lista de todos los usuarios excepto el actual.
-    """
-    users = User.query.filter(User.id != current_user.id).all()
-    return render_template("legacy/userlist.html", users=users, user=current_user)
+def userlist_redirect():
+    return redirect(url_for("users.directory"), code=301)
+
+
+@views.route('/publications')
+def publications_redirect():
+    return redirect(url_for("materials.explore"), code=301)
 
 # ---------------------------------
 # MENSAJES PRIVADOS ENTRE USUARIOS

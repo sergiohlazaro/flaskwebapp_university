@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "partials/user_badge.html" import user_badge %}
+{% block title %}{{ profile_user.display_name }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="card mb-4"><div class="card-body d-flex flex-column flex-md-row gap-3 align-items-md-center">
+    <img class="avatar-lg" src="{{ url_for('files.avatar', user_id=profile_user.id) }}" alt="Foto de {{ profile_user.display_name }}">
+    <div class="flex-grow-1">
+        <h1 class="h3 mb-1">{{ user_badge(profile_user) }}</h1>
+        {% if profile_user.bio %}<p class="bio-text mb-2">{{ profile_user.bio }}</p>{% endif %}
+        <p class="mb-0 d-flex flex-wrap gap-3">
+            {% if profile_user.twitter %}
+            <a href="https://x.com/{{ profile_user.twitter }}" target="_blank" rel="noopener noreferrer"><i class="bi bi-twitter-x" aria-hidden="true"></i> @{{ profile_user.twitter }}</a>
+            {% endif %}
+            {% if profile_user.linkedin %}
+            <a href="https://www.linkedin.com/in/{{ profile_user.linkedin }}" target="_blank" rel="noopener noreferrer"><i class="bi bi-linkedin" aria-hidden="true"></i> {{ profile_user.linkedin }}</a>
+            {% endif %}
+        </p>
+    </div>
+    <div>
+        {% if profile_user.id == current_user.id %}
+        <a class="btn btn-outline-primary" href="{{ url_for('users.account') }}">Editar mi perfil</a>
+        {% else %}
+        <a class="btn btn-primary" href="{{ url_for('views.messages', user_id=profile_user.id) }}"><i class="bi bi-envelope" aria-hidden="true"></i> Enviar mensaje</a>
+        {% endif %}
+    </div>
+</div></div>
+
+<h2 class="h5 mb-3">Material compartido</h2>
+{% if pagination.items %}
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
+    {% for material in pagination.items %}
+    <div class="col">{% include "partials/material_card.html" %}</div>
+    {% endfor %}
+</div>
+{% include "partials/pagination.html" %}
+{% else %}
+<div class="text-center text-secondary py-5">
+    <i class="bi bi-inbox fs-1" aria-hidden="true"></i>
+    <p class="mt-2 mb-0">Este usuario aún no ha compartido material.</p>
+</div>
+{% endif %}
+{% endblock %}

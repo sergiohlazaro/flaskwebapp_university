@@ -134,3 +134,21 @@ body {
 /* Comentarios y reportes */
 .comment-body { white-space: pre-line; overflow-wrap: anywhere; }
 .comment-hidden .comment-body { opacity: 0.6; }
+
+.avatar-lg {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.avatar-md {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.bio-text {
+    white-space: pre-line;
+}

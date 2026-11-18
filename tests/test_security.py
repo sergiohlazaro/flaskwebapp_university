@@ -2,71 +2,10 @@
 import io
 import os
 
-from conftest import login, make_user, png_bytes
+from conftest import login, make_user
 
 from website import db
 from website.models import User
-
-# ---------------------------------------------------------------------------
-# QA-01: la subida de foto de perfil debe funcionar sin el módulo imghdr
-# ---------------------------------------------------------------------------
-
-def test_qa01_profile_pic_valid_png_is_accepted(app, client):
-    user = make_user("pic@example.com")
-    login(client, "pic@example.com")
-
-    response = client.post(
-        "/profile",
-        data={"profile_pic": (png_bytes(), "avatar.png")},
-        content_type="multipart/form-data",
-        follow_redirects=True,
-    )
-
-    assert response.status_code == 200
-    assert b"Profile updated successfully." in response.data
-    stored = db.session.get(User, user.id).avatar
-    assert stored is not None
-    path = os.path.join(app.config["UPLOAD_ROOT"], "avatars", stored)
-    assert os.path.exists(path)
-    os.remove(path)
-
-
-def test_qa01_profile_pic_phone_jpeg_mpo_is_accepted(app, client):
-    from PIL import Image
-    mpo = io.BytesIO()
-    Image.new("RGB", (10, 10)).save(mpo, format="MPO", save_all=True,
-                                    append_images=[Image.new("RGB", (10, 10))])
-    mpo.seek(0)
-    user = make_user("phone@example.com")
-    login(client, "phone@example.com")
-
-    response = client.post(
-        "/profile",
-        data={"profile_pic": (mpo, "IMG_0001.jpg")},
-        content_type="multipart/form-data",
-        follow_redirects=True,
-    )
-
-    assert b"Profile updated successfully." in response.data
-    stored = db.session.get(User, user.id).avatar
-    assert stored is not None
-    os.remove(os.path.join(app.config["UPLOAD_ROOT"], "avatars", stored))
-
-
-def test_qa01_profile_pic_fake_image_is_rejected(app, client):
-    user = make_user("fake@example.com")
-    login(client, "fake@example.com")
-
-    response = client.post(
-        "/profile",
-        data={"profile_pic": (io.BytesIO(b"<script>alert(1)</script>"), "evil.png")},
-        content_type="multipart/form-data",
-        follow_redirects=True,
-    )
-
-    assert b"Invalid image file type." in response.data
-    assert db.session.get(User, user.id).avatar is None
-
 
 # ---------------------------------------------------------------------------
 # QA-02: los tests no deben tocar la base de datos real
@@ -193,61 +132,6 @@ def _static(app, *parts):
 
 def _logout(client):
     client.post("/logout")
-
-
-def test_sec05_profile_pic_named_default_does_not_overwrite_shared_default(app, client):
-    default_path = _static(app, "profile_pics", "default.jpg")
-    with open(default_path, "rb") as fh:
-        original = fh.read()
-    user = make_user("evil@example.com")
-    login(client, "evil@example.com")
-
-    client.post(
-        "/profile",
-        data={"profile_pic": (png_bytes(color="blue"), "default.jpg")},
-        content_type="multipart/form-data",
-    )
-
-    try:
-        with open(default_path, "rb") as fh:
-            assert fh.read() == original
-    finally:
-        with open(default_path, "wb") as fh:  # restaurar si el test falla
-            fh.write(original)
-        stored = db.session.get(User, user.id).avatar
-        if stored is not None:
-            stored_path = os.path.join(app.config["UPLOAD_ROOT"], "avatars", stored)
-            assert os.path.exists(stored_path)  # se guardó con nombre aleatorio, fuera de static
-            assert stored != "default.jpg"
-            os.remove(stored_path)
-
-
-def _upload_publication(client, email, content):
-    make_user(email)
-    login(client, email)
-    client.post(
-        "/publications",
-        data={"publication": "hi", "publication_file": (io.BytesIO(content), "notes.txt", "text/plain")},
-        content_type="multipart/form-data",
-    )
-    _logout(client)
-
-
-def test_sec05_same_attachment_name_from_two_users_keeps_both_files(app, client):
-    from website.models import Publication
-    _upload_publication(client, "a@example.com", b"secret of A")
-    _upload_publication(client, "b@example.com", b"content of B")
-
-    paths = [p.file_path for p in Publication.query.order_by(Publication.id).all()]
-    try:
-        assert len(set(paths)) == 2
-        with open(_static(app, "uploads", "publications", paths[0]), "rb") as fh:
-            assert fh.read() == b"secret of A"
-    finally:
-        for p in set(paths):
-            full = _static(app, "uploads", "publications", p)
-            if os.path.exists(full):
-                os.remove(full)
 
 
 def test_qa03_each_login_record_gets_its_own_timestamp(app):
