@@ -207,11 +207,30 @@ def test_email_change_with_verification_same_response(app_verify, vclient, new):
     assert user.email == "old@uni.es"
     [mail] = sent_emails()
     assert mail["to"] == new
+    # La cuenta muestra lo mismo en ambos casos: la dirección pedida como pendiente.
+    assert user.pending_email == new
+    assert f"Pendiente de verificar: <strong>{new}</strong>" in html
     if new == "free@uni.es":
-        assert user.pending_email == new and "/verificar/" in mail["body"]
+        assert "/verificar/" in mail["body"]
     else:
-        assert user.pending_email is None
         assert "/verificar/" not in mail["body"] and "Owner" in mail["body"]
+
+
+def test_email_change_taken_pending_can_never_apply(app_verify, vclient):
+    user = make_user("old@uni.es")
+    owner = make_user("taken@uni.es", name="Owner")
+    login(vclient, "old@uni.es")
+    _change_email(vclient, "free@uni.es")
+    free_link = _verify_link(sent_emails()[0]["body"])
+    _change_email(vclient, "taken@uni.es")  # sustituye la pendiente; no se emite ningún token para ella
+    assert [m["to"] for m in sent_emails()] == ["free@uni.es", "taken@uni.es"]
+    assert len([m for m in sent_emails() if "/verificar/" in m["body"]]) == 1
+    # Aunque el dueño libere la dirección después, el único token emitido (otra dirección) no aplica.
+    owner.email = "elsewhere@uni.es"
+    db.session.commit()
+    assert INVALID in vclient.get(free_link).get_data(as_text=True)
+    db.session.refresh(user)
+    assert user.email == "old@uni.es" and user.pending_email == "taken@uni.es"
 
 
 def test_stale_verify_token_does_not_apply(app_verify, vclient):

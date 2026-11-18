@@ -180,13 +180,15 @@ def update_email():
             # El email no cambia hasta verificar la nueva dirección. Misma respuesta si la dirección
             # ya es de otra cuenta (sin enumeración): solo su dueño recibe un aviso.
             new_email = form.new_email.data
+            # La dirección pedida consta como pendiente en ambos casos (la cuenta se ve igual); solo si
+            # está libre se emite un token. Si está ocupada no existe ninguno que pueda aplicarla.
+            current_user.pending_email = new_email
+            db.session.commit()
             if _email_taken(new_email):
                 owner = User.query.filter_by(email=new_email).first()
                 send_email(owner.email, "Intento de uso de tu email", "email/email_change_taken.txt",
                            name=owner.name, link=url_for("auth.forgot_password", _external=True))
             else:
-                current_user.pending_email = new_email
-                db.session.commit()
                 link = url_for("auth.verify_email", _external=True,
                                token=make_verify_token(current_user, new_email))
                 send_email(new_email, "Confirma tu nuevo email", "email/email_verify.txt",
