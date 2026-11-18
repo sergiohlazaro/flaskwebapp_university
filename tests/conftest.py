@@ -6,7 +6,7 @@ from PIL import Image
 from werkzeug.security import generate_password_hash
 
 from website import create_app, db
-from website.models import User
+from website.models import User, utcnow
 
 PASSWORD = "password123"
 
@@ -59,7 +59,7 @@ def client(app):
     return app.test_client()
 
 
-def make_user(email, role=1, name="Test", surname="User", is_teacher=False):
+def make_user(email, role=1, name="Test", surname="User", is_teacher=False, verified=True):
     user = User(
         name=name,
         surname=surname,
@@ -67,6 +67,7 @@ def make_user(email, role=1, name="Test", surname="User", is_teacher=False):
         password=generate_password_hash(PASSWORD),
         role=role,
         is_teacher=is_teacher,
+        email_verified_at=utcnow() if verified else None,
     )
     db.session.add(user)
     db.session.commit()

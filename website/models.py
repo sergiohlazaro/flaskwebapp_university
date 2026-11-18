@@ -68,6 +68,9 @@ class User(UserMixin, db.Model):
     is_blocked = db.Column(db.Boolean, nullable=False, default=False)
     # SEC-11: sube al cambiar la contraseña; invalida sesiones y cookies "remember" anteriores.
     session_version = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    # SEC-09: None = email sin verificar. pending_email = cambio de email a la espera de verificar.
+    email_verified_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    pending_email = db.Column(db.String(100), nullable=True)
     # None = usar el avatar por defecto
     avatar = db.Column(db.String(150), nullable=True, default=None)
     twitter = db.Column(db.String(255), nullable=True)

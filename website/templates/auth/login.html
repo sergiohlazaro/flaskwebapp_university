@@ -23,6 +23,7 @@
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Iniciar sesión</button>
             </form>
+            {% if show_resend %}<p class="text-center mt-3 mb-1"><a href="{{ url_for('auth.resend_verification') }}">Pedir un nuevo enlace de activación</a></p>{% endif %}
             <p class="text-center mt-3 mb-1"><a href="{{ url_for('auth.forgot_password') }}">¿Has olvidado tu contraseña?</a></p>
             <p class="text-center mb-0"><a href="{{ url_for('auth.signup') }}">¿No tienes cuenta? Regístrate</a></p>
         </div></div>

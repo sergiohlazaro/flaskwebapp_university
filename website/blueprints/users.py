@@ -34,9 +34,10 @@ from ..models import (
     Report,
     User,
 )
+from ..services.mail import send_email
 from ..services.query import escape_like, favorite_ids, feed_loader_options, page_param
 from ..services.reports import delete_reports_for
-from ..services.tokens import bump_session_version
+from ..services.tokens import bump_session_version, make_verify_token
 from ..services.uploads import UploadError, delete_upload, save_avatar
 
 users = Blueprint("users", __name__)
@@ -174,6 +175,17 @@ def update_email():
             form.new_email.errors = ["Ese ya es tu email."]
         elif _email_taken(form.new_email.data):
             form.new_email.errors = [DUPLICATE_EMAIL]
+        elif current_app.config["REQUIRE_EMAIL_VERIFICATION"]:
+            # El email no cambia hasta verificar la nueva dirección.
+            current_user.pending_email = form.new_email.data
+            db.session.commit()
+            link = url_for("auth.verify_email", _external=True,
+                           token=make_verify_token(current_user, form.new_email.data))
+            send_email(form.new_email.data, "Confirma tu nuevo email", "email/email_verify.txt",
+                       name=current_user.name, link=link)
+            flash(f"Te hemos enviado un enlace a {form.new_email.data} para confirmarlo. "
+                  "Tu email no cambia hasta entonces.", "success")
+            return redirect(url_for("users.account"))
         else:
             current_user.email = form.new_email.data
             try:

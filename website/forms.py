@@ -72,7 +72,12 @@ class SignupForm(FlaskForm):
     ])
 
     def validate_email(self, field):
+        from flask import current_app
+
         from .models import User
+        # Con verificación activa el registro no revela si el email existe (lo gestiona la vista).
+        if current_app.config["REQUIRE_EMAIL_VERIFICATION"]:
+            return
         if User.query.filter_by(email=field.data).first():
             raise ValidationError("Ya existe una cuenta con ese email.")
 

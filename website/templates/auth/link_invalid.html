@@ -6,7 +6,11 @@
         <div class="card"><div class="card-body p-4 text-center">
             <h1 class="h4 mb-3">El enlace no es válido o ha caducado.</h1>
             <p class="text-secondary">Puedes pedir uno nuevo.</p>
+            {% if resend %}
+            <a class="btn btn-primary" href="{{ url_for('auth.resend_verification') }}">Pedir un nuevo enlace</a>
+            {% else %}
             <a class="btn btn-primary" href="{{ url_for('auth.forgot_password') }}">Recuperar contraseña</a>
+            {% endif %}
         </div></div>
     </div>
 </div>

@@ -123,6 +123,18 @@ def unblock(user_id):
     return redirect(url_for("admin.users"))
 
 
+@admin.route("/usuarios/<int:user_id>/verificar", methods=["POST"])
+@login_required
+@admin_required
+def mark_verified(user_id):
+    user = _user_or_404(user_id)
+    if user.email_verified_at is None:
+        user.email_verified_at = utcnow()
+        db.session.commit()
+    flash("Usuario marcado como verificado.", "success")
+    return redirect(url_for("admin.users"))
+
+
 @admin.route("/usuarios/<int:user_id>/profesor", methods=["POST"])
 @login_required
 @admin_required

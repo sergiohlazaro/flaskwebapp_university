@@ -55,6 +55,7 @@
         <section class="card mb-4"><div class="card-body p-4">
             <h2 class="h5 mb-3">Email</h2>
             <p class="small text-secondary">Tu email actual es <strong>{{ current_user.email }}</strong>. Solo tú lo ves.</p>
+            {% if current_user.pending_email %}<p class="small text-secondary">Pendiente de verificar: <strong>{{ current_user.pending_email }}</strong></p>{% endif %}
             <form method="post" action="{{ url_for('users.update_email') }}" novalidate>
                 {{ email_form.hidden_tag() }}
                 <div class="mb-3">

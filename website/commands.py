@@ -5,7 +5,7 @@ from sqlalchemy import func
 from werkzeug.security import generate_password_hash
 
 from .extensions import db
-from .models import User
+from .models import User, utcnow
 
 MIN_PASSWORD_LENGTH = 8
 MAX_EMAIL_LENGTH = 100  # tamaño de la columna user.email
@@ -37,6 +37,7 @@ def create_admin_command(email, name, surname, password):
         password=generate_password_hash(password),
         role=0,
         is_blocked=False,
+        email_verified_at=utcnow(),
     )
     db.session.add(admin)
     db.session.commit()
