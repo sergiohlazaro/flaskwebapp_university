@@ -52,3 +52,17 @@ def test_app_name_default(app):
 
 def test_no_flask_caching_extension(app):
     assert "cache" not in app.extensions
+
+
+def test_remember_cookie_hardening(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("SECRET_KEY", "x" * 64)
+    prod = create_app(MEMORY_DB)
+    assert prod.config["REMEMBER_COOKIE_SECURE"] is True
+    assert prod.config["REMEMBER_COOKIE_HTTPONLY"] is True
+    assert prod.config["REMEMBER_COOKIE_SAMESITE"] == "Lax"
+    monkeypatch.setenv("APP_ENV", "development")
+    dev = create_app(MEMORY_DB)
+    assert dev.config["REMEMBER_COOKIE_SECURE"] is False
+    assert dev.config["REMEMBER_COOKIE_HTTPONLY"] is True
+    assert dev.config["REMEMBER_COOKIE_SAMESITE"] == "Lax"

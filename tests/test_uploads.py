@@ -161,3 +161,21 @@ def test_decompression_bomb_is_upload_error(app, monkeypatch):
         validate_upload(fs(png_bytes(size=(10, 10)), "a.png"), ALLOWED_MATERIAL_EXTENSIONS)
     with pytest.raises(UploadError, match="demasiado grande"):
         save_avatar(fs(png_bytes(size=(10, 10)), "a.png"))
+
+
+def test_image_over_pixel_cap_is_rejected_before_decoding(app, monkeypatch):
+    from website.services import uploads
+    monkeypatch.setattr(uploads, "MAX_IMAGE_PIXELS", 50)
+    with pytest.raises(UploadError, match="La imagen es demasiado grande."):
+        validate_upload(fs(png_bytes(size=(10, 10)), "a.png"), ALLOWED_MATERIAL_EXTENSIONS)
+    with pytest.raises(UploadError, match="La imagen es demasiado grande."):
+        save_avatar(fs(png_bytes(size=(10, 10)), "a.png"))
+    validate_upload(fs(png_bytes(size=(7, 7)), "b.png"), ALLOWED_MATERIAL_EXTENSIONS)  # 49 px: dentro del tope
+
+
+def test_decompression_bomb_warning_is_an_error(app, monkeypatch):
+    from PIL import Image
+    # Entre el aviso (MAX/1) y el error (MAX*2) de Pillow: antes se decodificaba igualmente.
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 60)
+    with pytest.raises(UploadError, match="demasiado grande"):
+        save_avatar(fs(png_bytes(size=(10, 10)), "a.png"))

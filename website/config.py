@@ -12,6 +12,9 @@ class BaseConfig:
     SESSION_COOKIE_SECURE = False
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_SECURE = False
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = "Lax"
 
     TESTING = False
     WTF_CSRF_ENABLED = True
@@ -30,6 +33,7 @@ class TestingConfig(BaseConfig):
 
 class ProductionConfig(BaseConfig):
     SESSION_COOKIE_SECURE = True
+    REMEMBER_COOKIE_SECURE = True
 
 
 _CONFIGS = {

@@ -7,6 +7,8 @@ import mimetypes
 import os
 import unicodedata
 import uuid
+import warnings
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Literal
 
@@ -31,6 +33,10 @@ _OLE_MAGIC = b"\xd0\xcf\x11\xe0"
 _NAME_MAX = 255  # tamaño de las columnas original_name / file_original_name
 _IMAGE_MIMES = {"png": "image/png", "jpeg": "image/jpeg", "gif": "image/gif"}
 _IMAGE_STORED_EXT = {"png": "png", "jpeg": "jpg", "gif": "gif"}
+# Tope de píxeles (ancho x alto, leído de la cabecera) antes de decodificar: Pillow solo avisa
+# entre su límite y el doble, y aun así decodificaría la imagen entera en memoria.
+MAX_IMAGE_PIXELS = 40_000_000
+TOO_BIG_IMAGE_MSG = "La imagen es demasiado grande."
 
 
 class UploadError(ValueError):
@@ -45,6 +51,20 @@ class SavedFile:
     size: int
 
 
+@contextmanager
+def _strict_bomb_check():
+    """Convierte el aviso de bomba de descompresión de Pillow en error."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", Image.DecompressionBombWarning)
+        yield
+
+
+def _check_pixels(image):
+    width, height = image.size
+    if width * height > MAX_IMAGE_PIXELS:
+        raise UploadError(TOO_BIG_IMAGE_MSG)
+
+
 def detect_image_type(stream):
     """Tipo real de una imagen a partir de su contenido ('png', 'jpeg', 'gif'...).
 
@@ -52,12 +72,15 @@ def detect_image_type(stream):
     multi-imagen de muchos móviles: se tratan como jpeg.
     """
     try:
-        with Image.open(stream) as image:
+        with _strict_bomb_check(), Image.open(stream) as image:
+            _check_pixels(image)
             image.verify()
             detected = (image.format or "").lower() or None
             return "jpeg" if detected == "mpo" else detected
-    except Image.DecompressionBombError:
-        raise UploadError("La imagen es demasiado grande.") from None
+    except UploadError:
+        raise
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning):
+        raise UploadError(TOO_BIG_IMAGE_MSG) from None
     except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
         return None
     finally:
@@ -158,17 +181,28 @@ def save_avatar(file: FileStorage) -> SavedFile:
     stored_name = _new_stored_name(_IMAGE_STORED_EXT[detected])
     path = upload_path("avatars", stored_name)
     try:
-        with Image.open(file.stream) as image:
+        with _strict_bomb_check(), Image.open(file.stream) as image:
+            _check_pixels(image)
             image.thumbnail((300, 300))
             if fmt == "JPEG" and image.mode not in ("RGB", "L"):
                 image = image.convert("RGB")
             image.save(path, format=fmt)
-    except (OSError, SyntaxError, ValueError, Image.DecompressionBombError):
-        if os.path.exists(path):
-            os.remove(path)
+    except UploadError:
+        _remove_quietly(path)
+        raise
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning):
+        _remove_quietly(path)
+        raise UploadError(TOO_BIG_IMAGE_MSG) from None
+    except (OSError, SyntaxError, ValueError):
+        _remove_quietly(path)
         raise UploadError("El archivo no es una imagen válida.") from None
     return SavedFile(stored_name, clean_original_name(file.filename), _IMAGE_MIMES[detected],
                      os.path.getsize(path))
+
+
+def _remove_quietly(path):
+    if os.path.exists(path):
+        os.remove(path)
 
 
 def delete_upload(kind: str, stored_name: str) -> None:
